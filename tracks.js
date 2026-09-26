@@ -124,7 +124,6 @@ const WORLDS = [
     }
 ];
 
-// Helper: Seeded pseudo-random number generator for deterministic tracks
 function seededRandom(seed) {
     const x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
@@ -137,18 +136,83 @@ function generateLevelData(levelNum) {
     const world = WORLDS[worldIndex];
 
     const title = `Mundo ${worldIndex + 1}: Nivel ${stage}`;
-    const subtitle = `${world.name} • Desafío ${levelNum}/100`;
+    const subtitle = `${world.name} • Nivel ${levelNum}/100`;
 
-    // Seed based on level
-    let seed = levelNum * 31 + 17;
+    // LEVEL 1: HAND-TUNED BEGINNER LEVEL (NO LOOPS, SUPER SMOOTH!)
+    if (levelNum === 1) {
+        const segs = TrackUtils.makePolyline([
+            [-100, 420],
+            [0, 420],
+            [400, 420],   // Starting flat run
+            [600, 390],   // Gentle incline
+            [800, 350],   // Smooth hill crest
+            [1000, 390],  // Gentle descent
+            [1200, 420],  // Valley
+            [1400, 370],  // Small jump ramp
+            [1600, 420],  // Smooth landing slope
+            [1850, 420],  // Straightaway
+            [2300, 420]   // Finish straight
+        ]);
+
+        return {
+            id: 1,
+            worldId: 1,
+            stage: 1,
+            title: "Mundo 1: Nivel 1 (Tutorial)",
+            subtitle: "Acelera, mantén el equilibrio y llega a la meta",
+            skyGradient: world.skyGradient,
+            sunColor: world.sunColor,
+            mountainColor1: world.mountainColor1,
+            mountainColor2: world.mountainColor2,
+            starTimes: [14.0, 9.5, 6.2],
+            start: { x: 120, y: 350 },
+            finish: { x: 2050, y: 420, width: 80, height: 110 },
+            build: () => segs
+        };
+    }
+
+    // LEVEL 2: INTRO TO TABLE-TOP JUMP (NO LOOPS)
+    if (levelNum === 2) {
+        const segs = TrackUtils.makePolyline([
+            [-100, 420],
+            [0, 420],
+            [400, 420],
+            [650, 340],  // Ramp up
+            [850, 340],  // Plateau
+            [1050, 420], // Descent
+            [1250, 420],
+            [1450, 350], // Jump
+            [1700, 420], // Landing
+            [2250, 420]
+        ]);
+
+        return {
+            id: 2,
+            worldId: 1,
+            stage: 2,
+            title: "Mundo 1: Nivel 2",
+            subtitle: "Salta sobre la meseta y aterriza suave",
+            skyGradient: world.skyGradient,
+            sunColor: world.sunColor,
+            mountainColor1: world.mountainColor1,
+            mountainColor2: world.mountainColor2,
+            starTimes: [14.0, 9.8, 6.8],
+            start: { x: 120, y: 350 },
+            finish: { x: 2050, y: 420, width: 80, height: 110 },
+            build: () => segs
+        };
+    }
+
+    // GENERAL PROCEDURAL GENERATOR FOR LEVELS 3 TO 100
+    let seed = levelNum * 37 + 19;
     const rand = () => { seed++; return seededRandom(seed); };
 
     let curX = 0;
-    let curY = 400;
+    let curY = 420;
     const segs = [];
 
-    // Starting Platform (safe zone to accelerate)
-    const startFlatWidth = 320;
+    // Starting Platform (safe straight line to get moving)
+    const startFlatWidth = 360;
     segs.push(...TrackUtils.makePolyline([
         [-80, curY],
         [curX, curY],
@@ -156,101 +220,106 @@ function generateLevelData(levelNum) {
     ]));
     curX += startFlatWidth;
 
-    // Number of modules scales with level
-    const numSections = 3 + Math.floor(stage * 0.7) + Math.floor(worldIndex * 0.4);
+    const numSections = 3 + Math.floor(stage * 0.6) + Math.floor(worldIndex * 0.4);
+
+    // Loops are strictly reserved for World 3 and above!
+    const allowLoops = (worldIndex >= 2);
 
     for (let s = 0; s < numSections; s++) {
-        const choice = (s + stage + worldIndex) % 7;
+        // Module selection
+        let choice = (s * 3 + stage + worldIndex) % 5;
+        if (!allowLoops && choice === 1) {
+            choice = 0; // Replace loops with smooth hills in Worlds 1 and 2
+        }
 
         if (choice === 0) {
-            // Speed Hill & Jump
-            const rampW = 200 + rand() * 80;
-            const rampH = 80 + rand() * 60;
+            // Smooth Hill & Kicker Jump
+            const rampW = 200 + rand() * 60;
+            const rampH = 60 + rand() * 40;
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + rampW * 0.5, curY + 40],
+                [curX + rampW * 0.5, curY - rampH * 0.5],
                 [curX + rampW, curY - rampH]
             ]));
             curX += rampW;
             curY -= rampH;
 
-            // Air gap into landing slope
-            const gap = 140 + rand() * 80;
+            // Small air gap
+            const gap = 110 + rand() * 60;
             curX += gap;
-            curY += 70 + rand() * 50;
+            curY += rampH * 0.8;
 
-            const landW = 240 + rand() * 60;
+            const landW = 220 + rand() * 60;
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + landW * 0.6, curY + 60],
-                [curX + landW, curY + 70]
+                [curX + landW * 0.5, curY + 40],
+                [curX + landW, curY + 40]
             ]));
             curX += landW;
-            curY += 70;
+            curY += 40;
 
-        } else if (choice === 1 || choice === 5) {
-            // 360-Degree Loop!
-            // First: speed descent approach
+        } else if (choice === 1 && allowLoops) {
+            // High-Speed Open Spiral Loop (Only in World 3+)
+            // 1. Steep downhill run-up for maximum momentum!
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + 180, curY + 80],
-                [curX + 320, curY + 90]
+                [curX + 160, curY + 90],
+                [curX + 300, curY + 100]
             ]));
-            curX += 320;
-            curY += 90;
+            curX += 300;
+            curY += 100;
 
-            const loopRadius = 140 + (worldIndex % 3) * 15;
+            const loopRadius = 135;
             const loopCx = curX + loopRadius;
             const loopCy = curY - loopRadius;
 
-            // Full 360 loop
-            segs.push(...TrackUtils.makeArc(loopCx, loopCy, loopRadius, Math.PI * 0.5, Math.PI * 2.5, 34));
+            // Open arc (from bottom through top to open exit)
+            segs.push(...TrackUtils.makeArc(loopCx, loopCy, loopRadius, Math.PI * 0.5, Math.PI * 2.3, 30));
 
-            curX = loopCx + loopRadius * 0.8;
-            curY = loopCy + loopRadius;
+            // Shift exit forward so it never collides with entrance
+            curX = loopCx + loopRadius * 0.75;
+            curY = loopCy + loopRadius + 10;
 
-            // Exit ramp with boost
+            // Exit ramp with speed run
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + 160, curY],
-                [curX + 300, curY - 50]
+                [curX + 180, curY],
+                [curX + 320, curY - 30]
             ]));
-            curX += 300;
-            curY -= 50;
+            curX += 320;
+            curY -= 30;
 
         } else if (choice === 2) {
             // Rollercoaster undulations / Whoops
-            const waves = 2 + Math.floor(rand() * 2);
-            const waveLength = 160;
-            const amp = 35 + rand() * 25;
+            const waves = 2;
+            const waveLength = 150;
+            const amp = 30 + rand() * 20;
             const pts = [[curX, curY]];
 
             for (let w = 0; w < waves; w++) {
                 pts.push([curX + (w + 0.3) * waveLength, curY - amp]);
-                pts.push([curX + (w + 0.7) * waveLength, curY + amp * 0.6]);
+                pts.push([curX + (w + 0.7) * waveLength, curY + amp * 0.4]);
                 pts.push([curX + (w + 1.0) * waveLength, curY]);
             }
             segs.push(...TrackUtils.makePolyline(pts));
             curX += waves * waveLength;
 
         } else if (choice === 3) {
-            // High Jump Gap over the Void
-            const kickerW = 180;
+            // Speed Jump Gap
+            const kickerW = 160;
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + kickerW * 0.4, curY + 20],
-                [curX + kickerW, curY - 80] // Steep kicker
+                [curX + kickerW * 0.5, curY],
+                [curX + kickerW, curY - 60]
             ]));
             curX += kickerW;
-            curY -= 80;
+            curY -= 60;
 
-            // Big abyss gap
-            const gapDist = 180 + stage * 10;
+            const gapDist = 120 + stage * 8;
             curX += gapDist;
-            curY += 120; // Landing lower
+            curY += 60;
 
-            // Floating Landing Pad
-            const islandW = 280;
+            const islandW = 240;
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
                 [curX + islandW * 0.5, curY + 20],
@@ -260,33 +329,31 @@ function generateLevelData(levelNum) {
             curY += 20;
 
         } else {
-            // Technical Step-Down & Cambered Turn
-            const stepW = 220;
+            // Step-down terrace
+            const stepW = 180;
             segs.push(...TrackUtils.makePolyline([
                 [curX, curY],
-                [curX + 120, curY - 30],
-                [curX + stepW, curY - 10]
+                [curX + stepW, curY - 20]
             ]));
             curX += stepW;
-            curY -= 10;
+            curY -= 20;
 
-            const dropW = 240;
+            const dropW = 200;
             segs.push(...TrackUtils.makePolyline([
-                [curX + 80, curY + 60],
-                [curX + dropW * 0.6, curY + 90],
-                [curX + dropW, curY + 90]
+                [curX + 60, curY + 50],
+                [curX + dropW, curY + 60]
             ]));
             curX += dropW;
-            curY += 90;
+            curY += 60;
         }
 
-        // Clamp Y to safe range
-        if (curY > 520) curY = 460;
-        if (curY < 240) curY = 320;
+        // Clamp Y to comfortable riding boundaries
+        if (curY > 500) curY = 450;
+        if (curY < 260) curY = 320;
     }
 
     // Finish Run Platform
-    const finishRun = 360;
+    const finishRun = 340;
     segs.push(...TrackUtils.makePolyline([
         [curX, curY],
         [curX + finishRun, curY]
@@ -297,11 +364,11 @@ function generateLevelData(levelNum) {
 
     // Estimate Star Times based on track length
     const totalTrackLength = finishX;
-    const baseProTime = Math.round((totalTrackLength / 370 + 3.2) * 10) / 10;
+    const baseProTime = Math.round((totalTrackLength / 360 + 3.0) * 10) / 10;
     const starTimes = [
-        Math.round((baseProTime * 1.8) * 10) / 10, // 1 Star (Finish)
-        Math.round((baseProTime * 1.35) * 10) / 10, // 2 Stars (Great)
-        baseProTime                               // 3 Stars (Pro)
+        Math.round((baseProTime * 1.7) * 10) / 10, // 1 Star (Finish)
+        Math.round((baseProTime * 1.3) * 10) / 10, // 2 Stars (Great)
+        baseProTime                              // 3 Stars (Pro)
     ];
 
     return {

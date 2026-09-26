@@ -277,6 +277,135 @@
         canvas.height = window.innerHeight;
     }
 
+    // --- 100-LEVEL PROGRESSION & STARS ---
+    function getStarsForLevel(lvlNum) {
+        return parseInt(localStorage.getItem(`bikerace_stars_lvl_${lvlNum}`)) || 0;
+    }
+
+    function setStarsForLevel(lvlNum, stars) {
+        const cur = getStarsForLevel(lvlNum);
+        if (stars > cur) {
+            localStorage.setItem(`bikerace_stars_lvl_${lvlNum}`, stars);
+        }
+    }
+
+    function getBestTimeForLevel(lvlNum) {
+        return localStorage.getItem(`bikerace_best_lvl_${lvlNum}`) || null;
+    }
+
+    function setBestTimeForLevel(lvlNum, time) {
+        const prev = parseFloat(getBestTimeForLevel(lvlNum)) || 9999;
+        if (time < prev) {
+            localStorage.setItem(`bikerace_best_lvl_${lvlNum}`, time.toFixed(2));
+        }
+    }
+
+    function getTotalStars() {
+        let total = 0;
+        for (let i = 1; i <= 100; i++) {
+            total += getStarsForLevel(i);
+        }
+        return total;
+    }
+
+    function isLevelUnlocked(lvlNum) {
+        if (lvlNum === 1) return true;
+        // Level N is unlocked if level N-1 has at least 1 star
+        return getStarsForLevel(lvlNum - 1) >= 1;
+    }
+
+    let selectedWorldTab = 0; // 0 to 9
+
+    function openLevelMap() {
+        const modal = document.getElementById('levelMapModal');
+        if (!modal) return;
+        selectedWorldTab = Math.floor(currentLevelIndex / 10);
+        renderLevelMap();
+        modal.classList.add('active');
+        window.sounds.playClick();
+    }
+
+    function closeLevelMap() {
+        const modal = document.getElementById('levelMapModal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    function toggleLevelMap() {
+        const modal = document.getElementById('levelMapModal');
+        if (!modal) return;
+        if (modal.classList.contains('active')) {
+            closeLevelMap();
+        } else {
+            openLevelMap();
+        }
+    }
+
+    function renderLevelMap() {
+        const totalStars = getTotalStars();
+        const badge = document.getElementById('mapTotalStarsBadge');
+        if (badge) badge.textContent = `⭐ ${totalStars} / 300 Estrellas`;
+
+        // Render World Tabs (10 Worlds)
+        const tabsContainer = document.getElementById('worldsTabs');
+        if (tabsContainer && window.WORLDS) {
+            tabsContainer.innerHTML = '';
+            WORLDS.forEach((w, wIdx) => {
+                const btn = document.createElement('button');
+                btn.className = `world-tab ${wIdx === selectedWorldTab ? 'active' : ''}`;
+                btn.textContent = `M${w.id}: ${w.name}`;
+                btn.onclick = () => {
+                    selectedWorldTab = wIdx;
+                    renderLevelMap();
+                    window.sounds.playClick();
+                };
+                tabsContainer.appendChild(btn);
+            });
+        }
+
+        // Render 10 Level Cards for selectedWorldTab
+        const grid = document.getElementById('levelsGrid');
+        if (grid) {
+            grid.innerHTML = '';
+            const startLevel = selectedWorldTab * 10 + 1;
+            for (let i = 0; i < 10; i++) {
+                const lvlNum = startLevel + i;
+                const unlocked = isLevelUnlocked(lvlNum);
+                const stars = getStarsForLevel(lvlNum);
+                const bestTime = getBestTimeForLevel(lvlNum);
+                const isCurrent = (currentLevelIndex === lvlNum - 1);
+
+                const card = document.createElement('div');
+                card.className = `level-card ${unlocked ? '' : 'locked'} ${isCurrent ? 'current' : ''}`;
+
+                if (unlocked) {
+                    let starsHtml = '';
+                    for (let s = 1; s <= 3; s++) {
+                        starsHtml += `<span class="${s <= stars ? 'star-gold' : ''}">★</span>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="level-card-number">${lvlNum}</div>
+                        <div class="level-card-stars">${starsHtml}</div>
+                        <div class="level-card-time">${bestTime ? bestTime + 's' : '--'}</div>
+                    `;
+
+                    card.onclick = () => {
+                        window.sounds.playClick();
+                        closeLevelMap();
+                        loadLevel(lvlNum - 1);
+                    };
+                } else {
+                    card.innerHTML = `
+                        <div class="level-card-number">${lvlNum}</div>
+                        <div class="level-card-lock">🔒</div>
+                    `;
+                }
+
+                grid.appendChild(card);
+            }
+        }
+    }
+
     // --- LEVEL MANAGEMENT ---
     function loadLevel(index) {
         currentLevelIndex = index;
@@ -393,7 +522,7 @@
             });
         }
 
-        // Calculate Stars
+        // Calculate Stars (1, 2, or 3)
         const starTimes = levelData.starTimes;
         let starsEarned = 1;
         if (finalTime <= starTimes[2]) {
@@ -402,12 +531,11 @@
             starsEarned = 2;
         }
 
-        // Save Best Time in LocalStorage
-        const bestKey = `bikerace_best_level_${currentLevelIndex}`;
-        const previousBest = parseFloat(localStorage.getItem(bestKey)) || 9999;
-        if (finalTime < previousBest) {
-            localStorage.setItem(bestKey, finalTime.toFixed(2));
-        }
+        const levelNum = currentLevelIndex + 1;
+        setStarsForLevel(levelNum, starsEarned);
+        setBestTimeForLevel(levelNum, finalTime);
+
+        updateUIHUD();
 
         // Show Victory Overlay
         setTimeout(() => {
@@ -440,8 +568,10 @@
     function hideOverlays() {
         const crashModal = document.getElementById('crashModal');
         const victoryModal = document.getElementById('victoryModal');
+        const mapModal = document.getElementById('levelMapModal');
         if (crashModal) crashModal.classList.remove('active');
         if (victoryModal) victoryModal.classList.remove('active');
+        if (mapModal) mapModal.classList.remove('active');
     }
 
     // --- CONTROLS & PHYSICS UPDATE ---
@@ -457,6 +587,13 @@
                 e.preventDefault();
                 restartLevel();
             }
+            if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                toggleLevelMap();
+            }
+            if (e.key === 'Escape') {
+                closeLevelMap();
+            }
         });
 
         window.addEventListener('keyup', e => {
@@ -466,44 +603,10 @@
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') input.leanRight = false;
         });
 
-        // Touch & On-Screen Buttons
-        setupTouchButton('btnGas', state => { input.gas = state; });
-        setupTouchButton('btnBrake', state => { input.brake = state; });
-        setupTouchButton('btnLeanLeft', state => { input.leanLeft = state; });
-        setupTouchButton('btnLeanRight', state => { input.leanRight = state; });
-
-        // Left / Right Screen Touch Driving (Like original Bike Race: Left = Brake, Right = Gas)
+        // Left / Right Screen Touch Driving (tapping left half = brake, right half = gas)
         canvas.addEventListener('touchstart', handleCanvasTouch, { passive: false });
         canvas.addEventListener('touchmove', handleCanvasTouch, { passive: false });
         canvas.addEventListener('touchend', clearCanvasTouch, { passive: false });
-
-        // Sandbox Editor Mouse & Touch Drawing
-        canvas.addEventListener('mousedown', startDrawSegment);
-        canvas.addEventListener('mousemove', updateDrawSegment);
-        canvas.addEventListener('mouseup', endDrawSegment);
-    }
-
-    function setupTouchButton(id, callback) {
-        const el = document.getElementById(id);
-        if (!el) return;
-
-        const start = (e) => {
-            e.preventDefault();
-            window.sounds.init();
-            callback(true);
-            el.classList.add('pressed');
-        };
-        const end = (e) => {
-            e.preventDefault();
-            callback(false);
-            el.classList.remove('pressed');
-        };
-
-        el.addEventListener('mousedown', start);
-        el.addEventListener('mouseup', end);
-        el.addEventListener('mouseleave', end);
-        el.addEventListener('touchstart', start, { passive: false });
-        el.addEventListener('touchend', end, { passive: false });
     }
 
     function handleCanvasTouch(e) {
@@ -779,9 +882,11 @@
         ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Distant Mountain Silhouettes (Parallax layers)
-        drawParallaxMountains(0.08, canvas.height * 0.75, 140, 'rgba(40, 10, 5, 0.35)');
-        drawParallaxMountains(0.18, canvas.height * 0.88, 80, 'rgba(20, 5, 2, 0.65)');
+        // Distant Mountain Silhouettes (Parallax layers colored by world)
+        const mCol1 = (levelData && levelData.mountainColor1) || 'rgba(40, 10, 5, 0.35)';
+        const mCol2 = (levelData && levelData.mountainColor2) || 'rgba(20, 5, 2, 0.65)';
+        drawParallaxMountains(0.08, canvas.height * 0.75, 140, mCol1);
+        drawParallaxMountains(0.18, canvas.height * 0.88, 80, mCol2);
     }
 
     function drawParallaxMountains(factor, baseHeight, amplitude, color) {
@@ -1327,14 +1432,16 @@
     }
 
     function updateUIHUD() {
-        const titleEl = document.getElementById('levelTitle');
-        const descEl = document.getElementById('levelDesc');
-        if (titleEl && levelData) titleEl.textContent = levelData.title;
-        if (descEl && levelData) descEl.textContent = levelData.subtitle;
+        const totalStars = getTotalStars();
+        const totalStarsEl = document.getElementById('hudTotalStars');
+        if (totalStarsEl) {
+            totalStarsEl.textContent = `⭐ ${totalStars}/300`;
+        }
 
-        // Highlight active level in dropdown
-        const select = document.getElementById('levelSelect');
-        if (select) select.value = currentLevelIndex;
+        const currentLvlNameEl = document.getElementById('currentLevelName');
+        if (currentLvlNameEl && levelData) {
+            currentLvlNameEl.textContent = `Mundo ${levelData.worldId} - Nvl ${levelData.stage}`;
+        }
     }
 
     // --- RAGDOLL UPDATE ---
@@ -1364,18 +1471,19 @@
 
     // --- UI SETUP & EVENT HANDLERS ---
     function setupUI() {
-        // Level select dropdown
-        const select = document.getElementById('levelSelect');
-        if (select) {
-            select.innerHTML = '';
-            LEVELS.forEach((lvl, idx) => {
-                const opt = document.createElement('option');
-                opt.value = idx;
-                opt.textContent = `${idx + 1}. ${lvl.title}`;
-                select.appendChild(opt);
+        // Map Modal Trigger Buttons
+        const btnOpenMap = document.getElementById('btnOpenMap');
+        if (btnOpenMap) {
+            btnOpenMap.addEventListener('click', () => {
+                window.sounds.init();
+                openLevelMap();
             });
-            select.addEventListener('change', (e) => {
-                loadLevel(parseInt(e.target.value));
+        }
+
+        const btnCloseMap = document.getElementById('btnCloseMap');
+        if (btnCloseMap) {
+            btnCloseMap.addEventListener('click', () => {
+                closeLevelMap();
             });
         }
 
@@ -1393,7 +1501,7 @@
         if (btnNext) {
             btnNext.addEventListener('click', () => {
                 window.sounds.init();
-                const nextIdx = (currentLevelIndex + 1) % LEVELS.length;
+                const nextIdx = Math.min(currentLevelIndex + 1, LEVELS.length - 1);
                 loadLevel(nextIdx);
             });
         }
@@ -1414,26 +1522,6 @@
                 window.sounds.init();
                 const isMuted = window.sounds.toggleMute();
                 btnAudio.textContent = isMuted ? '🔇' : '🔊';
-            });
-        }
-
-        // Sandbox Toolbar Buttons
-        const btnClearTrack = document.getElementById('btnClearTrack');
-        if (btnClearTrack) {
-            btnClearTrack.addEventListener('click', () => {
-                customSegments = [];
-                buildTrack(levelData);
-                window.sounds.playClick();
-            });
-        }
-
-        const btnExportTrack = document.getElementById('btnExportTrack');
-        if (btnExportTrack) {
-            btnExportTrack.addEventListener('click', () => {
-                const json = JSON.stringify(customSegments);
-                navigator.clipboard.writeText(json).then(() => {
-                    alert('¡Pista copiada al portapapeles! Puedes compartir este código JSON con quien quieras.');
-                });
             });
         }
     }

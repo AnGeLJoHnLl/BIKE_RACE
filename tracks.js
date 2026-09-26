@@ -1,12 +1,11 @@
-// Track generator & level definitions for Bike Race Web
+// Track Generator & 100-Level System for Bike Race Web
+// 10 Worlds x 10 Levels = 100 Deterministic, Physics-Tuned Tracks!
 
 const TrackUtils = {
-    // Generates a straight line segment
     makeLine(x1, y1, x2, y2, thickness = 14) {
         return { type: 'line', x1, y1, x2, y2, thickness };
     },
 
-    // Generates connected line segments from a list of points
     makePolyline(points, thickness = 14) {
         const segments = [];
         for (let i = 0; i < points.length - 1; i++) {
@@ -22,7 +21,6 @@ const TrackUtils = {
         return segments;
     },
 
-    // Generates a smooth circular arc or loop
     makeArc(cx, cy, radius, startAngle, endAngle, steps = 24, thickness = 14) {
         const segments = [];
         const angleStep = (endAngle - startAngle) / steps;
@@ -39,229 +37,297 @@ const TrackUtils = {
             });
         }
         return segments;
-    },
-
-    // Generates a sine-wave hill or valley
-    makeWave(startX, startY, length, amplitude, cycles = 1, steps = 30, thickness = 14) {
-        const points = [];
-        for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            const x = startX + t * length;
-            const y = startY - Math.sin(t * Math.PI * 2 * cycles) * amplitude;
-            points.push([x, y]);
-        }
-        return this.makePolyline(points, thickness);
-    },
-
-    // Generates a smooth full 360-degree loop
-    makeFullLoop(cx, cy, radius, thickness = 14) {
-        // Full loop starting from bottom-left entrance to bottom-right exit
-        return this.makeArc(cx, cy, radius, Math.PI * 0.5, Math.PI * 2.5, 36, thickness);
     }
 };
 
-const LEVELS = [
+// 10 Unique Worlds with distinct visual aesthetics and themes
+const WORLDS = [
     {
         id: 1,
-        title: "Desierto: Inicio",
-        subtitle: "Acelera, haz caballitos y salta hacia la meta",
+        name: "Desierto Cálido",
         skyGradient: ["#ff9900", "#ff4500", "#3a0600"],
-        sunColor: "rgba(255, 230, 120, 0.9)",
-        theme: "desert",
-        starTimes: [14.0, 10.0, 6.8],
-        start: { x: 100, y: 350 },
-        finish: { x: 2350, y: 360, width: 90, height: 110 },
-        build: () => {
-            let segs = [];
-            // Starting straight platform
-            segs.push(...TrackUtils.makePolyline([
-                [0, 420],
-                [350, 420],
-                [550, 390],
-                [750, 310], // Ramp up
-            ]));
-            // Gentle landing slope
-            segs.push(...TrackUtils.makePolyline([
-                [900, 390],
-                [1150, 450],
-                [1350, 450],
-                [1500, 380], // Second jump
-            ]));
-            // Final hill and finish run
-            segs.push(...TrackUtils.makePolyline([
-                [1680, 430],
-                [1900, 460],
-                [2100, 430],
-                [2500, 430]
-            ]));
-            return segs;
-        }
+        sunColor: "rgba(255, 235, 130, 0.95)",
+        mountainColor1: "rgba(50, 15, 5, 0.4)",
+        mountainColor2: "rgba(25, 5, 2, 0.7)"
     },
     {
         id: 2,
-        title: "El Gran Loop 360°",
-        subtitle: "Coge máxima velocidad para no caerte en el rizo",
-        skyGradient: ["#ff7700", "#d62828", "#1f0014"],
-        sunColor: "rgba(255, 200, 80, 0.95)",
-        theme: "fire",
-        starTimes: [15.0, 10.5, 7.5],
-        start: { x: 120, y: 260 },
-        finish: { x: 2750, y: 340, width: 90, height: 110 },
-        build: () => {
-            let segs = [];
-            // Steep descent for speed
-            segs.push(...TrackUtils.makePolyline([
-                [0, 320],
-                [250, 340],
-                [550, 480],
-                [850, 520],
-                [1050, 520]
-            ]));
-
-            // Smooth Loop entrance and circular track (radius: 170px)
-            const loopCx = 1350;
-            const loopCy = 350;
-            const loopRadius = 175;
-            segs.push(...TrackUtils.makeArc(loopCx, loopCy, loopRadius, Math.PI * 0.5, Math.PI * 2.5, 36));
-
-            // Exit from loop into a launch ramp
-            segs.push(...TrackUtils.makePolyline([
-                [1350, 525],
-                [1650, 525],
-                [1850, 450], // launch ramp
-            ]));
-
-            // High air gap over void, landing down
-            segs.push(...TrackUtils.makePolyline([
-                [2100, 490],
-                [2350, 430],
-                [2550, 410],
-                [2900, 410]
-            ]));
-            return segs;
-        }
+        name: "Cañón Rocoso",
+        skyGradient: ["#e76f51", "#f4a261", "#264653"],
+        sunColor: "rgba(255, 210, 120, 0.9)",
+        mountainColor1: "rgba(45, 20, 15, 0.45)",
+        mountainColor2: "rgba(20, 10, 8, 0.75)"
     },
     {
         id: 3,
-        title: "Doble Rizo & Acrobacias",
-        subtitle: "Dos loops consecutivos y saltos acrobáticos",
-        skyGradient: ["#f77f00", "#d62828", "#003049"],
-        sunColor: "rgba(255, 240, 150, 0.9)",
-        theme: "sunset",
-        starTimes: [19.0, 14.0, 9.8],
-        start: { x: 100, y: 280 },
-        finish: { x: 3400, y: 390, width: 90, height: 110 },
-        build: () => {
-            let segs = [];
-            // Run-up
-            segs.push(...TrackUtils.makePolyline([
-                [0, 350],
-                [300, 370],
-                [600, 490],
-                [800, 500]
-            ]));
-
-            // First loop
-            segs.push(...TrackUtils.makeArc(1020, 360, 145, Math.PI * 0.5, Math.PI * 2.5, 30));
-
-            // Connector ramp
-            segs.push(...TrackUtils.makePolyline([
-                [1020, 505],
-                [1350, 505],
-                [1600, 530]
-            ]));
-
-            // Second bigger loop
-            segs.push(...TrackUtils.makeArc(1820, 360, 175, Math.PI * 0.5, Math.PI * 2.5, 34));
-
-            // Exit ramp with a massive jump
-            segs.push(...TrackUtils.makePolyline([
-                [1820, 535],
-                [2100, 535],
-                [2350, 410] // steep kicker ramp
-            ]));
-
-            // Floating island landing
-            segs.push(...TrackUtils.makePolyline([
-                [2650, 450],
-                [2850, 460],
-                [3100, 460],
-                [3550, 460]
-            ]));
-            return segs;
-        }
+        name: "Valle de los Loops",
+        skyGradient: ["#ff7700", "#d62828", "#1f0014"],
+        sunColor: "rgba(255, 180, 50, 0.95)",
+        mountainColor1: "rgba(60, 10, 20, 0.4)",
+        mountainColor2: "rgba(30, 5, 10, 0.7)"
     },
     {
         id: 4,
-        title: "Picos de Fuego Extremos",
-        subtitle: "Abismos gigantes, caídas verticales y precisión",
-        skyGradient: ["#ff0055", "#790038", "#12000a"],
-        sunColor: "rgba(255, 120, 50, 0.9)",
-        theme: "volcano",
-        starTimes: [22.0, 16.0, 11.2],
-        start: { x: 100, y: 200 },
-        finish: { x: 3700, y: 440, width: 90, height: 110 },
-        build: () => {
-            let segs = [];
-            // High drop
-            segs.push(...TrackUtils.makePolyline([
-                [0, 260],
-                [200, 260],
-                [450, 460],
-                [650, 520],
-                [850, 420] // Jump 1
-            ]));
-
-            // Floating pillar 1
-            segs.push(...TrackUtils.makePolyline([
-                [1050, 470],
-                [1250, 430] // Jump 2
-            ]));
-
-            // Floating pillar 2 with inverted curve
-            segs.push(...TrackUtils.makePolyline([
-                [1450, 480],
-                [1700, 540],
-                [1950, 440] // Jump 3 into loop
-            ]));
-
-            // Loop hanging over the abyss
-            segs.push(...TrackUtils.makeArc(2250, 340, 160, Math.PI * 0.5, Math.PI * 2.5, 32));
-
-            // Rollercoaster undulations
-            segs.push(...TrackUtils.makePolyline([
-                [2250, 500],
-                [2500, 500],
-                [2700, 400],
-                [2900, 520],
-                [3100, 410],
-                [3300, 500],
-                [3850, 500]
-            ]));
-            return segs;
-        }
+        name: "Glaciar Ártico",
+        skyGradient: ["#00b4d8", "#0077b6", "#03045e"],
+        sunColor: "rgba(230, 245, 255, 0.95)",
+        mountainColor1: "rgba(10, 40, 70, 0.45)",
+        mountainColor2: "rgba(5, 20, 40, 0.75)"
     },
     {
         id: 5,
-        title: "Modo Editor Libre (Sandbox)",
-        subtitle: "¡Dibuja tus propias pistas con el ratón o pantalla táctil y juégalas!",
-        skyGradient: ["#00b4d8", "#0077b6", "#03045e"],
-        sunColor: "rgba(255, 255, 255, 0.9)",
-        theme: "custom",
-        starTimes: [99.0, 99.0, 99.0],
-        start: { x: 100, y: 350 },
-        finish: { x: 1800, y: 400, width: 90, height: 110 },
-        isEditor: true,
-        build: () => {
-            // Default starter ground if no custom lines yet
-            return [
-                TrackUtils.makeLine(0, 450, 400, 450),
-                TrackUtils.makeLine(400, 450, 650, 380),
-                TrackUtils.makeLine(850, 450, 2000, 450)
-            ];
-        }
+        name: "Dunas Carmesí",
+        skyGradient: ["#f72585", "#7209b7", "#3a0ca3"],
+        sunColor: "rgba(255, 170, 220, 0.9)",
+        mountainColor1: "rgba(50, 10, 60, 0.4)",
+        mountainColor2: "rgba(25, 5, 30, 0.7)"
+    },
+    {
+        id: 6,
+        name: "Selva & Ruinas",
+        skyGradient: ["#588157", "#3a5a40", "#344e41"],
+        sunColor: "rgba(255, 240, 160, 0.9)",
+        mountainColor1: "rgba(20, 40, 25, 0.45)",
+        mountainColor2: "rgba(10, 20, 12, 0.75)"
+    },
+    {
+        id: 7,
+        name: "Metrópolis Neón",
+        skyGradient: ["#4cc9f0", "#4361ee", "#10002b"],
+        sunColor: "rgba(180, 240, 255, 0.95)",
+        mountainColor1: "rgba(20, 15, 50, 0.45)",
+        mountainColor2: "rgba(10, 5, 30, 0.8)"
+    },
+    {
+        id: 8,
+        name: "Picos de Lava",
+        skyGradient: ["#ff0055", "#9e0031", "#150009"],
+        sunColor: "rgba(255, 100, 30, 0.95)",
+        mountainColor1: "rgba(60, 5, 20, 0.5)",
+        mountainColor2: "rgba(30, 0, 10, 0.8)"
+    },
+    {
+        id: 9,
+        name: "Tormenta Eléctrica",
+        skyGradient: ["#ffd166", "#06d6a0", "#118ab2"],
+        sunColor: "rgba(255, 255, 200, 0.9)",
+        mountainColor1: "rgba(15, 30, 40, 0.45)",
+        mountainColor2: "rgba(8, 15, 25, 0.75)"
+    },
+    {
+        id: 10,
+        name: "Dimensión Titán",
+        skyGradient: ["#b5179e", "#480ca8", "#03071e"],
+        sunColor: "rgba(255, 215, 0, 0.95)",
+        mountainColor1: "rgba(35, 10, 45, 0.5)",
+        mountainColor2: "rgba(15, 5, 25, 0.85)"
     }
 ];
 
+// Helper: Seeded pseudo-random number generator for deterministic tracks
+function seededRandom(seed) {
+    const x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+// Generates a fully playable, unique track for any level (1 to 100)
+function generateLevelData(levelNum) {
+    const worldIndex = Math.floor((levelNum - 1) / 10);
+    const stage = ((levelNum - 1) % 10) + 1;
+    const world = WORLDS[worldIndex];
+
+    const title = `Mundo ${worldIndex + 1}: Nivel ${stage}`;
+    const subtitle = `${world.name} • Desafío ${levelNum}/100`;
+
+    // Seed based on level
+    let seed = levelNum * 31 + 17;
+    const rand = () => { seed++; return seededRandom(seed); };
+
+    let curX = 0;
+    let curY = 400;
+    const segs = [];
+
+    // Starting Platform (safe zone to accelerate)
+    const startFlatWidth = 320;
+    segs.push(...TrackUtils.makePolyline([
+        [-80, curY],
+        [curX, curY],
+        [curX + startFlatWidth, curY]
+    ]));
+    curX += startFlatWidth;
+
+    // Number of modules scales with level
+    const numSections = 3 + Math.floor(stage * 0.7) + Math.floor(worldIndex * 0.4);
+
+    for (let s = 0; s < numSections; s++) {
+        const choice = (s + stage + worldIndex) % 7;
+
+        if (choice === 0) {
+            // Speed Hill & Jump
+            const rampW = 200 + rand() * 80;
+            const rampH = 80 + rand() * 60;
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + rampW * 0.5, curY + 40],
+                [curX + rampW, curY - rampH]
+            ]));
+            curX += rampW;
+            curY -= rampH;
+
+            // Air gap into landing slope
+            const gap = 140 + rand() * 80;
+            curX += gap;
+            curY += 70 + rand() * 50;
+
+            const landW = 240 + rand() * 60;
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + landW * 0.6, curY + 60],
+                [curX + landW, curY + 70]
+            ]));
+            curX += landW;
+            curY += 70;
+
+        } else if (choice === 1 || choice === 5) {
+            // 360-Degree Loop!
+            // First: speed descent approach
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + 180, curY + 80],
+                [curX + 320, curY + 90]
+            ]));
+            curX += 320;
+            curY += 90;
+
+            const loopRadius = 140 + (worldIndex % 3) * 15;
+            const loopCx = curX + loopRadius;
+            const loopCy = curY - loopRadius;
+
+            // Full 360 loop
+            segs.push(...TrackUtils.makeArc(loopCx, loopCy, loopRadius, Math.PI * 0.5, Math.PI * 2.5, 34));
+
+            curX = loopCx + loopRadius * 0.8;
+            curY = loopCy + loopRadius;
+
+            // Exit ramp with boost
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + 160, curY],
+                [curX + 300, curY - 50]
+            ]));
+            curX += 300;
+            curY -= 50;
+
+        } else if (choice === 2) {
+            // Rollercoaster undulations / Whoops
+            const waves = 2 + Math.floor(rand() * 2);
+            const waveLength = 160;
+            const amp = 35 + rand() * 25;
+            const pts = [[curX, curY]];
+
+            for (let w = 0; w < waves; w++) {
+                pts.push([curX + (w + 0.3) * waveLength, curY - amp]);
+                pts.push([curX + (w + 0.7) * waveLength, curY + amp * 0.6]);
+                pts.push([curX + (w + 1.0) * waveLength, curY]);
+            }
+            segs.push(...TrackUtils.makePolyline(pts));
+            curX += waves * waveLength;
+
+        } else if (choice === 3) {
+            // High Jump Gap over the Void
+            const kickerW = 180;
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + kickerW * 0.4, curY + 20],
+                [curX + kickerW, curY - 80] // Steep kicker
+            ]));
+            curX += kickerW;
+            curY -= 80;
+
+            // Big abyss gap
+            const gapDist = 180 + stage * 10;
+            curX += gapDist;
+            curY += 120; // Landing lower
+
+            // Floating Landing Pad
+            const islandW = 280;
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + islandW * 0.5, curY + 20],
+                [curX + islandW, curY + 20]
+            ]));
+            curX += islandW;
+            curY += 20;
+
+        } else {
+            // Technical Step-Down & Cambered Turn
+            const stepW = 220;
+            segs.push(...TrackUtils.makePolyline([
+                [curX, curY],
+                [curX + 120, curY - 30],
+                [curX + stepW, curY - 10]
+            ]));
+            curX += stepW;
+            curY -= 10;
+
+            const dropW = 240;
+            segs.push(...TrackUtils.makePolyline([
+                [curX + 80, curY + 60],
+                [curX + dropW * 0.6, curY + 90],
+                [curX + dropW, curY + 90]
+            ]));
+            curX += dropW;
+            curY += 90;
+        }
+
+        // Clamp Y to safe range
+        if (curY > 520) curY = 460;
+        if (curY < 240) curY = 320;
+    }
+
+    // Finish Run Platform
+    const finishRun = 360;
+    segs.push(...TrackUtils.makePolyline([
+        [curX, curY],
+        [curX + finishRun, curY]
+    ]));
+
+    const finishX = curX + 220;
+    const finishY = curY;
+
+    // Estimate Star Times based on track length
+    const totalTrackLength = finishX;
+    const baseProTime = Math.round((totalTrackLength / 370 + 3.2) * 10) / 10;
+    const starTimes = [
+        Math.round((baseProTime * 1.8) * 10) / 10, // 1 Star (Finish)
+        Math.round((baseProTime * 1.35) * 10) / 10, // 2 Stars (Great)
+        baseProTime                               // 3 Stars (Pro)
+    ];
+
+    return {
+        id: levelNum,
+        worldId: worldIndex + 1,
+        stage: stage,
+        title: title,
+        subtitle: subtitle,
+        skyGradient: world.skyGradient,
+        sunColor: world.sunColor,
+        mountainColor1: world.mountainColor1,
+        mountainColor2: world.mountainColor2,
+        starTimes: starTimes,
+        start: { x: 100, y: 340 },
+        finish: { x: finishX, y: finishY, width: 80, height: 110 },
+        build: () => segs
+    };
+}
+
+// Generate the 100 levels array!
+const LEVELS = [];
+for (let i = 1; i <= 100; i++) {
+    LEVELS.push(generateLevelData(i));
+}
+
+window.WORLDS = WORLDS;
 window.LEVELS = LEVELS;
 window.TrackUtils = TrackUtils;
+window.generateLevelData = generateLevelData;

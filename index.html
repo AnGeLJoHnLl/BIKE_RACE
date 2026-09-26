@@ -3,22 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bike Race Web | Motorcross 2D</title>
+    <title>Bike Race Web | 100 Niveles</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏍️</text></svg>">
 </head>
 <body>
-    <!-- WebGL / 2D Canvas -->
+    <!-- Game Canvas -->
     <canvas id="gameCanvas"></canvas>
 
     <!-- Top HUD Bar -->
     <header class="hud-header">
         <div class="brand">
-            <div class="brand-icon">🏍️</div>
-            <div class="brand-info">
-                <h1 id="levelTitle">Bike Race</h1>
-                <p id="levelDesc">Nivel 1</p>
-            </div>
+            <button id="btnOpenMap" class="hud-map-btn" title="Seleccionar Nivel (M)">
+                🗺️ <span id="currentLevelName">Mundo 1 - Nvl 1</span>
+            </button>
         </div>
 
         <div class="hud-center">
@@ -27,55 +25,46 @@
                 <span id="hudTimer" class="stat-value">0.00s</span>
             </div>
             <div class="stat-item">
+                <span class="stat-label">Estrellas</span>
+                <span id="hudTotalStars" class="stat-value stars">⭐ 0/300</span>
+            </div>
+            <div class="stat-item">
                 <span class="stat-label">Flips</span>
                 <span id="hudFlips" class="stat-value flips">★ 0</span>
             </div>
         </div>
 
         <div class="hud-actions">
-            <select id="levelSelect" class="level-picker" title="Seleccionar Pista"></select>
             <button id="btnAudio" class="hud-btn" title="Sonido">🔊</button>
-            <button id="btnRestart" class="hud-btn" title="Reiniciar (R)">⟳</button>
+            <button id="btnRestart" class="hud-btn" title="Reiniciar Nivel (R)">⟳</button>
         </div>
     </header>
 
-    <!-- Sandbox Track Editor Toolbar (Level 5) -->
-    <div id="editorToolbar" class="editor-toolbar">
-        <span class="editor-info">✏️ Dibuja pistas arrastrando el ratón</span>
-        <button id="btnClearTrack" class="editor-btn">Borrar Pista</button>
-        <button id="btnExportTrack" class="editor-btn">Copiar Código</button>
-    </div>
-
-    <!-- Desktop Controls Hint -->
+    <!-- Desktop Controls Legend (NO TOUCH BUTTONS, ONLY LEGEND AS REQUESTED) -->
     <div class="controls-hint">
         <span>Acelerar: <span class="key-tag">↑</span> o <span class="key-tag">W</span></span>
         <span>Freno: <span class="key-tag">↓</span> o <span class="key-tag">S</span></span>
         <span>Inclinación: <span class="key-tag">←</span> <span class="key-tag">→</span> o <span class="key-tag">A</span> <span class="key-tag">D</span></span>
         <span>Reiniciar: <span class="key-tag">R</span></span>
+        <span>Mapa: <span class="key-tag">M</span></span>
     </div>
 
-    <!-- Mobile On-Screen Touch Controls -->
-    <div class="touch-controls">
-        <div class="touch-group">
-            <button id="btnLeanLeft" class="touch-btn" title="Inclinarse hacia atrás">
-                ⤺
-                <span class="label">Atrás</span>
-            </button>
-            <button id="btnLeanRight" class="touch-btn" title="Inclinarse hacia adelante">
-                ⤻
-                <span class="label">Adelante</span>
-            </button>
-        </div>
+    <!-- 100-Level Selection Map Modal -->
+    <div id="levelMapModal" class="modal-overlay">
+        <div class="level-map-card">
+            <div class="level-map-header">
+                <div class="level-map-title-box">
+                    <h2>Elegir Nivel</h2>
+                    <span id="mapTotalStarsBadge" class="map-stars-badge">⭐ 0 / 300 Estrellas</span>
+                </div>
+                <button id="btnCloseMap" class="close-map-btn" title="Cerrar">✕</button>
+            </div>
 
-        <div class="touch-group">
-            <button id="btnBrake" class="touch-btn btn-brake" title="Freno">
-                🛑
-                <span class="label">Freno</span>
-            </button>
-            <button id="btnGas" class="touch-btn btn-gas" title="Acelerador">
-                🚀
-                <span class="label">Gas</span>
-            </button>
+            <!-- Worlds Selector Tabs (10 Worlds) -->
+            <div id="worldsTabs" class="worlds-tabs"></div>
+
+            <!-- 10 Levels Grid for the selected World -->
+            <div id="levelsGrid" class="levels-grid"></div>
         </div>
     </div>
 
@@ -84,9 +73,10 @@
         <div class="modal-card">
             <div class="modal-icon">💥</div>
             <h2 class="modal-title">¡Te has caído!</h2>
-            <p class="modal-subtitle">Ten cuidado con no golpear la cabeza contra el suelo.</p>
+            <p class="modal-subtitle">¡Te has golpeado la cabeza!</p>
             <div class="modal-actions">
                 <button id="btnRetry" class="btn-primary">Reintentar (R)</button>
+                <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
             </div>
         </div>
     </div>
@@ -108,6 +98,7 @@
             <p id="victoryFlips" class="modal-subtitle">Piruetas: 0</p>
             <div class="modal-actions">
                 <button onclick="document.getElementById('btnRestart').click()" class="btn-secondary">Repetir</button>
+                <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
                 <button id="btnNextLevel" class="btn-primary">Siguiente Nivel ➔</button>
             </div>
         </div>

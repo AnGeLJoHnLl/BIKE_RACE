@@ -56,45 +56,51 @@
     let isDrawing = false;
     let drawStartPos = null;
 
+    // Screen shake
+    let screenShake = 0;
+
+    // Ejected ragdoll rider when crashed
+    let ragdollRider = null;
+
     // --- BIKE CREATION ---
     function createBike(x, y) {
         const group = Body.nextGroup(true); // Non-colliding group for bike parts
 
-        // Wheel dimensions
-        const wheelRadius = 17;
-        const wheelDistance = 64; // Distance between axles
+        // True Motocross proportions (wide wheelbase, large dirtbike knobby tires)
+        const wheelRadius = 21;
+        const wheelDistance = 98; // Proper wide stance so it looks like a real dirt bike
 
         // Wheels
-        const rearWheel = Bodies.circle(x - wheelDistance / 2, y + 10, wheelRadius, {
+        const rearWheel = Bodies.circle(x - wheelDistance / 2, y + 14, wheelRadius, {
             collisionFilter: { group: group },
-            friction: 1.0,
-            frictionStatic: 1.5,
+            friction: 1.1,
+            frictionStatic: 1.8,
             density: 0.05,
-            restitution: 0.15,
+            restitution: 0.12,
             label: 'rearWheel'
         });
 
-        const frontWheel = Bodies.circle(x + wheelDistance / 2, y + 10, wheelRadius, {
+        const frontWheel = Bodies.circle(x + wheelDistance / 2, y + 14, wheelRadius, {
             collisionFilter: { group: group },
-            friction: 0.95,
-            frictionStatic: 1.5,
+            friction: 1.0,
+            frictionStatic: 1.6,
             density: 0.045,
-            restitution: 0.15,
+            restitution: 0.12,
             label: 'frontWheel'
         });
 
-        // Chassis / Frame
-        const chassis = Bodies.rectangle(x, y, 54, 18, {
+        // Motocross Chassis / Main Frame
+        const chassis = Bodies.rectangle(x, y - 2, 78, 24, {
             collisionFilter: { group: group },
-            density: 0.025,
+            density: 0.028,
             friction: 0.4,
             label: 'chassis'
         });
 
-        // Rider Head (Crucial for Bike Race mechanics: touching ground = crash!)
-        const head = Bodies.circle(x - 4, y - 36, 12, {
+        // Rider Head & Torso Hitbox (Hits ground = CRASH!)
+        const head = Bodies.circle(x - 6, y - 48, 16, {
             collisionFilter: { group: group },
-            density: 0.015,
+            density: 0.012,
             restitution: 0.1,
             label: 'head'
         });
@@ -102,7 +108,7 @@
         // Rigid Head Mount to Chassis
         const headConstraint = Constraint.create({
             bodyA: chassis,
-            pointA: { x: -4, y: -26 },
+            pointA: { x: -6, y: -36 },
             bodyB: head,
             pointB: { x: 0, y: 0 },
             stiffness: 0.95,
@@ -110,28 +116,28 @@
             render: { visible: false }
         });
 
-        // Suspension Constraints (Springs connecting wheels to chassis)
+        // Realistic Motocross Suspension Constraints
         const rearSuspension = Constraint.create({
             bodyA: chassis,
-            pointA: { x: -wheelDistance / 2 + 4, y: 10 },
+            pointA: { x: -wheelDistance / 2 + 6, y: 12 },
             bodyB: rearWheel,
             pointB: { x: 0, y: 0 },
-            stiffness: 0.75,
-            damping: 0.25,
-            length: 12
+            stiffness: 0.8,
+            damping: 0.22,
+            length: 10
         });
 
         const frontSuspension = Constraint.create({
             bodyA: chassis,
-            pointA: { x: wheelDistance / 2 - 4, y: 10 },
+            pointA: { x: wheelDistance / 2 - 6, y: 12 },
             bodyB: frontWheel,
             pointB: { x: 0, y: 0 },
-            stiffness: 0.75,
-            damping: 0.25,
-            length: 12
+            stiffness: 0.8,
+            damping: 0.22,
+            length: 10
         });
 
-        // Cross-axle structural constraint to prevent chassis from folding over
+        // Axle wheelbase distance keeper to prevent distortion
         const axleConstraint = Constraint.create({
             bodyA: rearWheel,
             bodyB: frontWheel,
@@ -151,6 +157,7 @@
             rearWheel,
             frontWheel,
             head,
+            headConstraint,
             isAlive: true,
             flips: 0
         };
@@ -220,7 +227,7 @@
         });
         world = engine.world;
 
-        // Collision Handler (Head crash & Finish line)
+        // Collision Handler (Head crash, inverted chassis crash & Finish line)
         Events.on(engine, 'collisionStart', function(event) {
             if (gameState !== STATE.PLAYING) return;
 
@@ -237,11 +244,21 @@
                     return;
                 }
 
-                // Head Crash detection
+                // Head Crash detection (touching ground with helmet/rider)
                 if ((bodyA.label === 'head' && bodyB.label === 'track') ||
                     (bodyB.label === 'head' && bodyA.label === 'track')) {
-                    triggerCrash();
+                    triggerCrash("¡Te has golpeado la cabeza!");
                     return;
+                }
+
+                // Inverted Chassis Crash (landing upside down or on bike back)
+                if ((bodyA.label === 'chassis' && bodyB.label === 'track') ||
+                    (bodyB.label === 'chassis' && bodyA.label === 'track')) {
+                    const upFactor = Math.cos(bike.chassis.angle);
+                    if (upFactor < 0.35) { // Tilted more than 65 degrees: upside down!
+                        triggerCrash("¡Aterrizaje forzoso invertido!");
+                        return;
+                    }
                 }
             }
         });
@@ -279,7 +296,7 @@
         bike = createBike(levelData.start.x, levelData.start.y);
         World.add(world, bike.composite);
 
-        // Reset stats
+        // Reset stats & effects
         camera.x = levelData.start.x;
         camera.y = levelData.start.y;
         gameState = STATE.PLAYING;
@@ -291,6 +308,8 @@
         inAir = false;
         particles = [];
         floatingTexts = [];
+        ragdollRider = null;
+        screenShake = 0;
 
         updateUIHUD();
         hideOverlays();
@@ -307,32 +326,50 @@
     }
 
     // --- CRASH & VICTORY ---
-    function triggerCrash() {
+    function triggerCrash(reason = "¡Te has caído!") {
         if (gameState !== STATE.PLAYING) return;
         gameState = STATE.CRASHED;
         bike.isAlive = false;
         isTimerRunning = false;
         window.sounds.playCrash();
+        screenShake = 22;
 
-        // Spawn explosion particles
-        for (let i = 0; i < 40; i++) {
+        // Eject ragdoll rider into the air!
+        const chassis = bike.chassis;
+        const head = bike.head;
+        ragdollRider = {
+            x: head.position.x,
+            y: head.position.y,
+            vx: chassis.velocity.x * 1.15 + (Math.random() - 0.5) * 6,
+            vy: Math.min(chassis.velocity.y, 0) - 8,
+            angle: chassis.angle,
+            vRot: (Math.random() - 0.5) * 0.45,
+            alpha: 1.0
+        };
+
+        // Spawn impact sparks & smoke particles
+        for (let i = 0; i < 45; i++) {
             particles.push({
-                x: bike.head.position.x,
-                y: bike.head.position.y,
-                vx: (Math.random() - 0.5) * 16,
-                vy: (Math.random() - 0.7) * 16,
+                x: head.position.x,
+                y: head.position.y,
+                vx: (Math.random() - 0.5) * 18,
+                vy: (Math.random() - 0.7) * 18,
                 size: Math.random() * 6 + 3,
-                color: ['#ff4500', '#ffa500', '#ffd700', '#ffffff', '#222222'][Math.floor(Math.random() * 5)],
+                color: ['#ff4500', '#ffa500', '#ffd700', '#ffffff', '#111111'][Math.floor(Math.random() * 5)],
                 alpha: 1.0,
-                decay: 0.02 + Math.random() * 0.02
+                decay: 0.02 + Math.random() * 0.025
             });
         }
 
-        // Show Crash Overlay
+        // Show Crash Overlay with the specific reason
         setTimeout(() => {
             const crashModal = document.getElementById('crashModal');
-            if (crashModal) crashModal.classList.add('active');
-        }, 500);
+            if (crashModal) {
+                const sub = crashModal.querySelector('.modal-subtitle');
+                if (sub) sub.textContent = reason;
+                crashModal.classList.add('active');
+            }
+        }, 550);
     }
 
     function triggerVictory() {
@@ -537,6 +574,22 @@
         const front = bike.frontWheel;
         const chassis = bike.chassis;
 
+        // Check if bike fell into the abyss / void below the track
+        let lowestTrackY = 600;
+        if (trackBodies.length > 0) {
+            for (let i = 0; i < trackBodies.length; i++) {
+                const s = trackBodies[i].segmentData;
+                if (s) {
+                    if (s.y1 > lowestTrackY) lowestTrackY = s.y1;
+                    if (s.y2 > lowestTrackY) lowestTrackY = s.y2;
+                }
+            }
+        }
+        if (chassis.position.y > lowestTrackY + 200 || chassis.position.x < -250) {
+            triggerCrash("¡Caíste al abismo!");
+            return;
+        }
+
         // Throttle (Drive rear wheel)
         if (input.gas) {
             const maxAngularVel = 0.85;
@@ -644,9 +697,19 @@
         // Draw Sky & Parallax
         drawBackground();
 
+        // Screen Shake calculation
+        let shakeX = 0;
+        let shakeY = 0;
+        if (screenShake > 0) {
+            shakeX = (Math.random() - 0.5) * screenShake;
+            shakeY = (Math.random() - 0.5) * screenShake;
+            screenShake *= 0.88;
+            if (screenShake < 0.4) screenShake = 0;
+        }
+
         // World Coordinates Transformation
         ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.translate(canvas.width / 2 + shakeX, canvas.height / 2 + shakeY);
         ctx.scale(camera.scale, camera.scale);
         ctx.translate(-camera.x, -camera.y);
 
@@ -659,9 +722,14 @@
         // Draw Particles
         drawParticles();
 
-        // Draw Bike & Rider
-        if (bike && bike.isAlive) {
+        // Draw Motocross Bike (Draw even when crashed so it tumbles realistically!)
+        if (bike) {
             drawBike();
+        }
+
+        // Draw Ejected Ragdoll Rider if crashed
+        if (ragdollRider) {
+            drawRagdollRider();
         }
 
         // Draw Drawing Preview for Editor
@@ -672,7 +740,6 @@
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(drawStartPos.x, drawStartPos.y);
-            // Get current mouse pos in world
             ctx.lineTo(drawStartPos.x + 10, drawStartPos.y);
             ctx.stroke();
             ctx.restore();
@@ -815,62 +882,276 @@
         const chassis = bike.chassis;
         const rear = bike.rearWheel;
         const front = bike.frontWheel;
-        const head = bike.head;
 
-        // Draw Wheels
+        // 1. Draw Wheels at physical body locations with rolling rotation
         drawWheel(rear);
         drawWheel(front);
 
-        // Draw Suspension Forks / Swingarms
-        ctx.strokeStyle = '#2b2b2b';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        // Rear swingarm
-        ctx.moveTo(chassis.position.x - 6, chassis.position.y);
-        ctx.lineTo(rear.position.x, rear.position.y);
-        // Front telescopic fork
-        ctx.moveTo(chassis.position.x + 14, chassis.position.y - 12);
-        ctx.lineTo(front.position.x, front.position.y);
-        ctx.stroke();
-
-        // Draw Chassis (Motorcycle Silhouette Frame)
+        // 2. Draw Motocross Frame, Plastics, Engine, Suspension & Rider
         ctx.save();
         ctx.translate(chassis.position.x, chassis.position.y);
         ctx.rotate(chassis.angle);
 
+        // Rear Heavy-Duty Swingarm
+        ctx.strokeStyle = '#181818';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-10, 6);
+        ctx.lineTo(-49, 14);
+        ctx.stroke();
+
+        // Rear Monoshock with bright red coil spring
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#cccccc'; // Damper rod
+        ctx.beginPath();
+        ctx.moveTo(-10, -6);
+        ctx.lineTo(-30, 10);
+        ctx.stroke();
+
+        // Coiled Spring around shock
+        ctx.strokeStyle = '#ff2200';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        const shockSteps = 5;
+        for (let i = 0; i <= shockSteps; i++) {
+            const t = i / shockSteps;
+            const sx = -10 + (-30 - (-10)) * t;
+            const sy = -6 + (10 - (-6)) * t;
+            const offset = (i % 2 === 0 ? -4 : 4);
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx + offset, sy);
+        }
+        ctx.stroke();
+
+        // Rear Chain & Sprocket
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(-49, 14, 11, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#888888';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-49, 3);
+        ctx.lineTo(-10, -1);
+        ctx.moveTo(-49, 25);
+        ctx.lineTo(-10, 13);
+        ctx.stroke();
+
+        // Front Upside-Down Suspension Forks (Stanchions & Chrome sliders)
+        // Golden upper forks
+        ctx.strokeStyle = '#d4a017';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(28, -22);
+        ctx.lineTo(39, -4);
+        ctx.stroke();
+
+        // Chrome lower sliders
+        ctx.strokeStyle = '#e6e6e6';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(39, -4);
+        ctx.lineTo(49, 14);
+        ctx.stroke();
+
+        // Fork guards / brake mount
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(44, 4, 6, 8);
+
+        // Engine Crankcase & Cylinder with cooling fins
+        ctx.fillStyle = '#1f1f1f';
+        ctx.beginPath();
+        ctx.arc(-2, 8, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#2c2c2c';
+        // Cooling fins
+        for (let f = 0; f < 4; f++) {
+            ctx.fillRect(4, -3 + f * 3, 10, 1.8);
+        }
+
+        // Exhaust Header Pipe & Upswept Motocross Muffler
+        ctx.strokeStyle = '#b87333'; // Heat-colored bronze/copper
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(10, 0);
+        ctx.quadraticCurveTo(8, 14, -2, 14);
+        ctx.lineTo(-18, 6);
+        ctx.stroke();
+
+        // Muffler canister
+        ctx.fillStyle = '#444444';
+        ctx.strokeStyle = '#111111';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-20, 7);
+        ctx.lineTo(-58, -8);
+        ctx.lineTo(-56, -16);
+        ctx.lineTo(-18, -1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Muffler tip
+        ctx.fillStyle = '#ff5500';
+        ctx.fillRect(-59, -13, 3, 4);
+
+        // Motocross Body Plastics & Tank (Sharp, aggressive silhouette)
         ctx.fillStyle = '#0a0a0a';
         ctx.beginPath();
-        // Sleek dirtbike fuel tank & body fairing
-        ctx.moveTo(-28, -6);
-        ctx.lineTo(-8, -14);
-        ctx.lineTo(16, -15); // Handlebars mount
-        ctx.lineTo(26, -5);
-        ctx.lineTo(12, 12);  // Engine bottom
-        ctx.lineTo(-18, 10);
+        ctx.moveTo(28, -22); // Triple clamp
+        ctx.lineTo(8, -16);  // Tank dip
+        ctx.lineTo(-36, -16); // Seat bed
+        ctx.lineTo(-78, -32); // High pointed rear fender tip!
+        ctx.lineTo(-70, -20); // Rear fender bottom edge
+        ctx.lineTo(-30, -8);  // Side number plate
+        ctx.lineTo(-12, 4);   // Frame pivot
+        ctx.lineTo(12, 4);    // Front cradle
+        ctx.lineTo(24, -14);  // Shroud front
         ctx.closePath();
         ctx.fill();
 
-        // Handlebars
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#1a1a1a';
+        // Signature High Motocross Front Fender (Beak / Guardabarros delantero)
+        ctx.fillStyle = '#0a0a0a';
         ctx.beginPath();
-        ctx.moveTo(12, -15);
-        ctx.lineTo(18, -26);
+        ctx.moveTo(26, -20);
+        ctx.lineTo(70, -28); // Sharp beak extending way over front wheel!
+        ctx.lineTo(66, -21);
+        ctx.lineTo(28, -14);
+        ctx.closePath();
+        ctx.fill();
+
+        // Bold Orange Racing Accents (Signature Bike Race Style)
+        ctx.strokeStyle = '#ff5500';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        // Front fender edge
+        ctx.moveTo(26, -20);
+        ctx.lineTo(70, -28);
+        // Tank shroud decal
+        ctx.moveTo(22, -18);
+        ctx.lineTo(6, -14);
+        ctx.lineTo(14, -4);
+        // Rear fender top edge
+        ctx.moveTo(-34, -16);
+        ctx.lineTo(-78, -32);
         ctx.stroke();
 
-        // Exhaust pipe
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#777777';
+        // Motocross Flat Gripper Seat
+        ctx.fillStyle = '#1c1c1c';
         ctx.beginPath();
-        ctx.moveTo(-6, 6);
-        ctx.lineTo(-24, 0);
-        ctx.lineTo(-32, -4);
+        ctx.moveTo(6, -16);
+        ctx.lineTo(-36, -16);
+        ctx.lineTo(-34, -20);
+        ctx.lineTo(4, -20);
+        ctx.closePath();
+        ctx.fill();
+
+        // Handlebars & Crossbar
+        ctx.strokeStyle = '#111111';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(28, -22);
+        ctx.lineTo(22, -42);
         ctx.stroke();
+
+        // Crossbar
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#888';
+        ctx.beginPath();
+        ctx.moveTo(24, -36);
+        ctx.lineTo(21, -36);
+        ctx.stroke();
+
+        // Rubber grips
+        ctx.fillStyle = '#ff5500';
+        ctx.fillRect(19, -44, 6, 4);
+
+        // Draw Rider on top of the bike (if alive)
+        if (bike.isAlive) {
+            drawRiderOnBike();
+        }
 
         ctx.restore();
+    }
 
-        // Draw Rider (Iconic Bike Race Rider Silhouette)
-        drawRider(chassis, head);
+    function drawRiderOnBike() {
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Foot & Motocross Boot on footpeg
+        ctx.fillStyle = '#050505';
+        ctx.beginPath();
+        ctx.moveTo(-6, 12);
+        ctx.lineTo(4, 12);
+        ctx.lineTo(2, 6);
+        ctx.lineTo(-6, 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Leg (Shin & bent knee hugging tank)
+        ctx.strokeStyle = '#080808';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(-4, 8);
+        ctx.lineTo(8, -8);   // Knee
+        ctx.lineTo(-18, -18); // Hip on seat
+        ctx.stroke();
+
+        // Torso in athletic attack position
+        ctx.lineWidth = 15;
+        ctx.beginPath();
+        ctx.moveTo(-18, -18); // Hip
+        ctx.lineTo(6, -44);   // Shoulder
+        ctx.stroke();
+
+        // Arm reaching forward to handlebars
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(6, -44);   // Shoulder
+        ctx.lineTo(16, -32);  // Elbow
+        ctx.lineTo(22, -42);  // Hand on grip
+        ctx.stroke();
+
+        // Helmet & Head
+        // Helmet shell
+        ctx.fillStyle = '#080808';
+        ctx.beginPath();
+        ctx.arc(8, -58, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sharp Motocross Helmet Visor / Peak
+        ctx.beginPath();
+        ctx.moveTo(14, -66);
+        ctx.lineTo(36, -63); // Sun peak jutting forward!
+        ctx.lineTo(22, -59);
+        ctx.closePath();
+        ctx.fill();
+
+        // Chin guard
+        ctx.beginPath();
+        ctx.moveTo(22, -50);
+        ctx.lineTo(12, -46);
+        ctx.lineTo(8, -50);
+        ctx.closePath();
+        ctx.fill();
+
+        // Signature Bright Yellow Goggles (From Bike Race Icon)
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.ellipse(15, -57, 6.5, 4, 0.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Goggle glass reflection highlight
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(14, -58, 2.5, 1.2, 0.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
     }
 
     function drawWheel(wheel) {
@@ -878,109 +1159,109 @@
         ctx.translate(wheel.position.x, wheel.position.y);
         ctx.rotate(wheel.angle);
 
-        const r = wheel.circleRadius || 17;
+        const r = wheel.circleRadius || 21;
 
-        // Outer Tire (knobby dirtbike tire)
+        // Knobby Tire Treads (Dirtbike Knobs)
         ctx.fillStyle = '#111111';
+        const numKnobs = 14;
+        for (let i = 0; i < numKnobs; i++) {
+            const angle = (i * Math.PI * 2) / numKnobs;
+            ctx.save();
+            ctx.rotate(angle);
+            ctx.fillRect(-2.5, -r - 3, 5, 3.5);
+            ctx.restore();
+        }
+
+        // Tire Outer Rubber Ring
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.fill();
 
         // Rim
-        ctx.fillStyle = '#333333';
+        ctx.fillStyle = '#262626';
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.74, 0, Math.PI * 2);
         ctx.fill();
 
-        // Inner Hub
+        // Steel Brake Rotor Disc
+        ctx.fillStyle = '#555555';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.44, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Center Axle Hub
         ctx.fillStyle = '#0a0a0a';
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
         ctx.fill();
 
         // Spokes
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < 6; i++) {
-            const angle = (i * Math.PI) / 3;
+        ctx.strokeStyle = 'rgba(230, 230, 230, 0.65)';
+        ctx.lineWidth = 1.4;
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4;
             ctx.beginPath();
-            ctx.moveTo(-Math.cos(angle) * r * 0.7, -Math.sin(angle) * r * 0.7);
-            ctx.lineTo(Math.cos(angle) * r * 0.7, Math.sin(angle) * r * 0.7);
+            ctx.moveTo(-Math.cos(angle) * r * 0.72, -Math.sin(angle) * r * 0.72);
+            ctx.lineTo(Math.cos(angle) * r * 0.72, Math.sin(angle) * r * 0.72);
             ctx.stroke();
         }
 
         ctx.restore();
     }
 
-    function drawRider(chassis, head) {
+    function drawRagdollRider() {
+        if (!ragdollRider) return;
         ctx.save();
-
-        // Torso / Body (Leaning with bike)
-        const neckX = head.position.x;
-        const neckY = head.position.y + 10;
-        const hipX = chassis.position.x - 14 * Math.cos(chassis.angle);
-        const hipY = chassis.position.y - 14 * Math.sin(chassis.angle) - 4;
-
-        // Arms to handlebars
-        const handleX = chassis.position.x + 18 * Math.cos(chassis.angle) - 24 * Math.sin(chassis.angle);
-        const handleY = chassis.position.y + 18 * Math.sin(chassis.angle) + 24 * Math.cos(chassis.angle) - 10;
-
-        ctx.strokeStyle = '#050505';
+        ctx.translate(ragdollRider.x, ragdollRider.y);
+        ctx.rotate(ragdollRider.angle);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Torso
+        // Tumbling Torso
+        ctx.strokeStyle = '#080808';
         ctx.lineWidth = 14;
         ctx.beginPath();
-        ctx.moveTo(hipX, hipY);
-        ctx.lineTo(neckX, neckY);
+        ctx.moveTo(-10, 14);
+        ctx.lineTo(10, -14);
         ctx.stroke();
 
-        // Arm
+        // Flailing Arms
         ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.moveTo(neckX, neckY + 4);
-        ctx.lineTo((neckX + handleX) / 2 + 4, (neckY + handleY) / 2 + 6);
-        ctx.lineTo(handleX, handleY);
+        ctx.moveTo(10, -14);
+        ctx.lineTo(24, -28);
+        ctx.moveTo(10, -14);
+        ctx.lineTo(28, 2);
         ctx.stroke();
 
-        // Leg / Foot on peg
-        const pegX = chassis.position.x - 2 * Math.cos(chassis.angle) + 8 * Math.sin(chassis.angle);
-        const pegY = chassis.position.y - 2 * Math.sin(chassis.angle) + 8 * Math.cos(chassis.angle);
-
+        // Flailing Legs
         ctx.lineWidth = 7;
         ctx.beginPath();
-        ctx.moveTo(hipX, hipY);
-        ctx.lineTo(hipX + 10, hipY + 12);
-        ctx.lineTo(pegX, pegY);
+        ctx.moveTo(-10, 14);
+        ctx.lineTo(-26, 24);
+        ctx.moveTo(-10, 14);
+        ctx.lineTo(-14, 36);
         ctx.stroke();
 
-        // Rider Helmet
-        ctx.save();
-        ctx.translate(head.position.x, head.position.y);
-        ctx.rotate(chassis.angle);
-
-        // Helmet shell
-        ctx.fillStyle = '#050505';
+        // Tumbling Helmet
+        ctx.fillStyle = '#080808';
         ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.arc(14, -26, 14, 0, Math.PI * 2);
         ctx.fill();
 
-        // Helmet Visor / Sun peak
+        // Visor
         ctx.beginPath();
-        ctx.moveTo(2, -8);
-        ctx.lineTo(16, -5);
-        ctx.lineTo(6, -2);
+        ctx.moveTo(18, -34);
+        ctx.lineTo(38, -30);
+        ctx.lineTo(26, -25);
         ctx.closePath();
         ctx.fill();
 
-        // Iconic Yellow Goggles! (Direct from the Bike Race icon)
+        // Goggles
         ctx.fillStyle = '#ffcc00';
         ctx.beginPath();
-        ctx.ellipse(6, -1, 5, 3.5, 0.1, 0, Math.PI * 2);
+        ctx.ellipse(20, -25, 6, 3.5, 0.1, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.restore();
 
         ctx.restore();
     }
@@ -1056,6 +1337,16 @@
         if (select) select.value = currentLevelIndex;
     }
 
+    // --- RAGDOLL UPDATE ---
+    function updateRagdoll() {
+        if (!ragdollRider) return;
+        ragdollRider.vy += 0.52; // gravity
+        ragdollRider.vx *= 0.99;
+        ragdollRider.x += ragdollRider.vx;
+        ragdollRider.y += ragdollRider.vy;
+        ragdollRider.angle += ragdollRider.vRot;
+    }
+
     // --- MAIN GAME LOOP ---
     function gameLoop(timestamp) {
         // Step Matter.js physics (16.6ms fixed step)
@@ -1063,6 +1354,7 @@
 
         // Apply bike driving & tilt forces
         updatePhysics();
+        updateRagdoll();
 
         // Render everything
         render();

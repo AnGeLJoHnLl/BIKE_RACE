@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bike Race Web | Motorcross 2D</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏍️</text></svg>">
+</head>
+<body>
+    <!-- WebGL / 2D Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top HUD Bar -->
+    <header class="hud-header">
+        <div class="brand">
+            <div class="brand-icon">🏍️</div>
+            <div class="brand-info">
+                <h1 id="levelTitle">Bike Race</h1>
+                <p id="levelDesc">Nivel 1</p>
+            </div>
+        </div>
+
+        <div class="hud-center">
+            <div class="stat-item">
+                <span class="stat-label">Tiempo</span>
+                <span id="hudTimer" class="stat-value">0.00s</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Flips</span>
+                <span id="hudFlips" class="stat-value flips">★ 0</span>
+            </div>
+        </div>
+
+        <div class="hud-actions">
+            <select id="levelSelect" class="level-picker" title="Seleccionar Pista"></select>
+            <button id="btnAudio" class="hud-btn" title="Sonido">🔊</button>
+            <button id="btnRestart" class="hud-btn" title="Reiniciar (R)">⟳</button>
+        </div>
+    </header>
+
+    <!-- Sandbox Track Editor Toolbar (Level 5) -->
+    <div id="editorToolbar" class="editor-toolbar">
+        <span class="editor-info">✏️ Dibuja pistas arrastrando el ratón</span>
+        <button id="btnClearTrack" class="editor-btn">Borrar Pista</button>
+        <button id="btnExportTrack" class="editor-btn">Copiar Código</button>
+    </div>
+
+    <!-- Desktop Controls Hint -->
+    <div class="controls-hint">
+        <span>Acelerar: <span class="key-tag">↑</span> o <span class="key-tag">W</span></span>
+        <span>Freno: <span class="key-tag">↓</span> o <span class="key-tag">S</span></span>
+        <span>Inclinación: <span class="key-tag">←</span> <span class="key-tag">→</span> o <span class="key-tag">A</span> <span class="key-tag">D</span></span>
+        <span>Reiniciar: <span class="key-tag">R</span></span>
+    </div>
+
+    <!-- Mobile On-Screen Touch Controls -->
+    <div class="touch-controls">
+        <div class="touch-group">
+            <button id="btnLeanLeft" class="touch-btn" title="Inclinarse hacia atrás">
+                ⤺
+                <span class="label">Atrás</span>
+            </button>
+            <button id="btnLeanRight" class="touch-btn" title="Inclinarse hacia adelante">
+                ⤻
+                <span class="label">Adelante</span>
+            </button>
+        </div>
+
+        <div class="touch-group">
+            <button id="btnBrake" class="touch-btn btn-brake" title="Freno">
+                🛑
+                <span class="label">Freno</span>
+            </button>
+            <button id="btnGas" class="touch-btn btn-gas" title="Acelerador">
+                🚀
+                <span class="label">Gas</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Crash Modal -->
+    <div id="crashModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon">💥</div>
+            <h2 class="modal-title">¡Te has caído!</h2>
+            <p class="modal-subtitle">Ten cuidado con no golpear la cabeza contra el suelo.</p>
+            <div class="modal-actions">
+                <button id="btnRetry" class="btn-primary">Reintentar (R)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victoryModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon">🏁</div>
+            <h2 class="modal-title">¡Nivel Completado!</h2>
+            <div id="victoryStars" class="stars-container">
+                <span class="star active">★</span>
+                <span class="star active">★</span>
+                <span class="star">★</span>
+            </div>
+            <div class="time-badge">
+                <div class="label">Tiempo Final</div>
+                <div id="victoryTime" class="value">0.00s</div>
+            </div>
+            <p id="victoryFlips" class="modal-subtitle">Piruetas: 0</p>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('btnRestart').click()" class="btn-secondary">Repetir</button>
+                <button id="btnNextLevel" class="btn-primary">Siguiente Nivel ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="matter.min.js"></script>
+    <script src="audio.js"></script>
+    <script src="tracks.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

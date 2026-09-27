@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bike Race Web | 100 Niveles</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏍️</text></svg>">
+</head>
+<body>
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top HUD Bar -->
+    <header class="hud-header">
+        <div class="brand">
+            <button id="btnOpenMap" class="hud-map-btn" title="Seleccionar Nivel (M)">
+                🗺️ <span id="currentLevelName">Mundo 1 - Nvl 1</span>
+            </button>
+        </div>
+
+        <div class="hud-center">
+            <div class="stat-item">
+                <span class="stat-label">Tiempo</span>
+                <span id="hudTimer" class="stat-value">0.00s</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Estrellas</span>
+                <span id="hudTotalStars" class="stat-value stars">⭐ 0/300</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Flips</span>
+                <span id="hudFlips" class="stat-value flips">★ 0</span>
+            </div>
+        </div>
+
+        <div class="hud-actions">
+            <button id="btnAudio" class="hud-btn" title="Sonido">🔊</button>
+            <button id="btnRestart" class="hud-btn" title="Reiniciar Nivel (R)">⟳</button>
+        </div>
+    </header>
+
+    <!-- Desktop Controls Legend (NO TOUCH BUTTONS, ONLY LEGEND AS REQUESTED) -->
+    <div class="controls-hint">
+        <span>Acelerar: <span class="key-tag">↑</span> o <span class="key-tag">W</span></span>
+        <span>Freno: <span class="key-tag">↓</span> o <span class="key-tag">S</span></span>
+        <span>Inclinación: <span class="key-tag">←</span> <span class="key-tag">→</span> o <span class="key-tag">A</span> <span class="key-tag">D</span></span>
+        <span>Reiniciar: <span class="key-tag">R</span></span>
+        <span>Mapa: <span class="key-tag">M</span></span>
+    </div>
+
+    <!-- 100-Level Selection Map Modal -->
+    <div id="levelMapModal" class="modal-overlay">
+        <div class="level-map-card">
+            <div class="level-map-header">
+                <div class="level-map-title-box">
+                    <h2>Elegir Nivel</h2>
+                    <span id="mapTotalStarsBadge" class="map-stars-badge">⭐ 0 / 300 Estrellas</span>
+                </div>
+                <button id="btnCloseMap" class="close-map-btn" title="Cerrar">✕</button>
+            </div>
+
+            <!-- Worlds Selector Tabs (10 Worlds) -->
+            <div id="worldsTabs" class="worlds-tabs"></div>
+
+            <!-- 10 Levels Grid for the selected World -->
+            <div id="levelsGrid" class="levels-grid"></div>
+        </div>
+    </div>
+
+    <!-- Crash Modal -->
+    <div id="crashModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon">💥</div>
+            <h2 class="modal-title">¡Te has caído!</h2>
+            <p class="modal-subtitle">¡Te has golpeado la cabeza!</p>
+            <div class="modal-actions">
+                <button id="btnRetry" class="btn-primary">Reintentar (R)</button>
+                <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victoryModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon">🏁</div>
+            <h2 class="modal-title">¡Nivel Completado!</h2>
+            <div id="victoryStars" class="stars-container">
+                <span class="star active">★</span>
+                <span class="star active">★</span>
+                <span class="star">★</span>
+            </div>
+            <div class="time-badge">
+                <div class="label">Tiempo Final</div>
+                <div id="victoryTime" class="value">0.00s</div>
+            </div>
+            <p id="victoryFlips" class="modal-subtitle">Piruetas: 0</p>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('btnRestart').click()" class="btn-secondary">Repetir</button>
+                <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
+                <button id="btnNextLevel" class="btn-primary">Siguiente Nivel ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="matter.min.js"></script>
+    <script src="audio.js"></script>
+    <script src="tracks.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

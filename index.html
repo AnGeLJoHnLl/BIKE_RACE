@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bike Race Web | 100 Niveles</title>
+    <title>Bike Race Web | 100 Niveles & Garaje</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏍️</text></svg>">
 </head>
@@ -16,6 +16,9 @@
         <div class="brand">
             <button id="btnOpenMap" class="hud-map-btn" title="Seleccionar Nivel (M)">
                 🗺️ <span id="currentLevelName">Mundo 1 - Nvl 1</span>
+            </button>
+            <button id="btnOpenGarage" class="hud-garage-btn" title="Garaje de Motos (G)">
+                🏍️ Garaje
             </button>
         </div>
 
@@ -47,6 +50,7 @@
         <span>Inclinación: <span class="key-tag">←</span> <span class="key-tag">→</span> o <span class="key-tag">A</span> <span class="key-tag">D</span></span>
         <span>Reiniciar: <span class="key-tag">R</span></span>
         <span>Mapa: <span class="key-tag">M</span></span>
+        <span>Garaje: <span class="key-tag">G</span></span>
     </div>
 
     <!-- 100-Level Selection Map Modal -->
@@ -68,6 +72,35 @@
         </div>
     </div>
 
+    <!-- Bike Garage & Skins Modal -->
+    <div id="garageModal" class="modal-overlay">
+        <div class="garage-card">
+            <div class="garage-header">
+                <div class="garage-title-box">
+                    <h2>🏍️ Garaje de Motos</h2>
+                    <span id="garageStarsBadge" class="map-stars-badge">⭐ 0 / 300 Estrellas</span>
+                </div>
+                <button id="btnCloseGarage" class="close-map-btn" title="Cerrar">✕</button>
+            </div>
+
+            <!-- Interactive Live Preview of Selected Bike -->
+            <div class="garage-preview-container">
+                <canvas id="garagePreviewCanvas" width="480" height="230"></canvas>
+                <div class="garage-bike-info">
+                    <h3 id="previewBikeName">Motocross Clásica</h3>
+                    <p id="previewBikeTagline">La leyenda original de dos ruedas</p>
+                    <div class="preview-actions">
+                        <span id="previewBikeLockStatus" class="bike-status-badge">✅ DESBLOQUEADA</span>
+                        <button id="btnEquipBike" class="btn-primary">EQUIPADA</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carousel / Grid of Bike Cards -->
+            <div id="garageBikesGrid" class="garage-bikes-grid"></div>
+        </div>
+    </div>
+
     <!-- Crash Modal -->
     <div id="crashModal" class="modal-overlay">
         <div class="modal-card">
@@ -77,6 +110,7 @@
             <div class="modal-actions">
                 <button id="btnRetry" class="btn-primary">Reintentar (R)</button>
                 <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
+                <button onclick="document.getElementById('btnOpenGarage').click()" class="btn-secondary">🏍️ Garaje</button>
             </div>
         </div>
     </div>
@@ -99,6 +133,7 @@
             <div class="modal-actions">
                 <button onclick="document.getElementById('btnRestart').click()" class="btn-secondary">Repetir</button>
                 <button onclick="document.getElementById('btnOpenMap').click()" class="btn-secondary">🗺️ Niveles</button>
+                <button onclick="document.getElementById('btnOpenGarage').click()" class="btn-secondary">🏍️ Garaje</button>
                 <button id="btnNextLevel" class="btn-primary">Siguiente Nivel ➔</button>
             </div>
         </div>
@@ -108,6 +143,7 @@
     <script src="matter.min.js"></script>
     <script src="audio.js"></script>
     <script src="tracks.js"></script>
+    <script src="skins.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

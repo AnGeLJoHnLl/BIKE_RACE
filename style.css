@@ -72,6 +72,27 @@ body, html {
     box-shadow: 0 6px 20px rgba(255, 85, 0, 0.55);
 }
 
+.hud-garage-btn {
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.85), rgba(75, 0, 130, 0.9));
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(138, 43, 226, 0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.hud-garage-btn:hover {
+    transform: scale(1.04);
+    box-shadow: 0 6px 20px rgba(138, 43, 226, 0.55);
+}
+
 .hud-center {
     display: flex;
     align-items: center;
@@ -483,4 +504,170 @@ body, html {
 
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.22);
+}
+
+/* --- GARAGE & SKINS MODAL --- */
+.garage-card {
+    background: linear-gradient(135deg, #140d1a, #09050d);
+    border: 2px solid rgba(138, 43, 226, 0.65);
+    border-radius: 22px;
+    padding: 26px 32px;
+    max-width: 860px;
+    width: 94%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(138, 43, 226, 0.3);
+    animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.garage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 12px;
+}
+
+.garage-title-box {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.garage-title-box h2 {
+    font-size: 22px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffffff;
+}
+
+.garage-preview-container {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 14px 20px;
+    margin-bottom: 18px;
+}
+
+#garagePreviewCanvas {
+    background: radial-gradient(circle at center, rgba(138, 43, 226, 0.25) 0%, rgba(0, 0, 0, 0.7) 70%);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+    width: 320px;
+    height: 160px;
+}
+
+.garage-bike-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.garage-bike-info h3 {
+    font-size: 22px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+.garage-bike-info p {
+    font-size: 13px;
+    color: #aaa;
+    line-height: 1.4;
+}
+
+.preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 10px;
+}
+
+.bike-status-badge {
+    font-size: 12px;
+    font-weight: 800;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.bike-status-badge.unlocked {
+    background: rgba(0, 255, 100, 0.15);
+    color: #00ff66;
+    border: 1px solid rgba(0, 255, 100, 0.4);
+}
+
+.bike-status-badge.locked {
+    background: rgba(255, 50, 50, 0.15);
+    color: #ff4444;
+    border: 1px solid rgba(255, 50, 50, 0.4);
+}
+
+.garage-bikes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 12px;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.garage-bike-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 12px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.garage-bike-card:hover:not(.locked) {
+    background: rgba(138, 43, 226, 0.25);
+    border-color: #a855f7;
+    transform: translateY(-3px);
+}
+
+.garage-bike-card.active {
+    border-color: #00f0ff;
+    background: rgba(0, 240, 255, 0.15);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+}
+
+.garage-bike-card.equipped {
+    border-color: #00ff66;
+}
+
+.garage-bike-card.locked {
+    opacity: 0.45;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.card-bike-icon {
+    font-size: 26px;
+    margin-bottom: 2px;
+}
+
+.card-bike-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.card-bike-stars {
+    font-size: 11px;
+    color: #ffd700;
+    font-weight: bold;
 }

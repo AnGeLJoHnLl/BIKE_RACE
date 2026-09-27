@@ -307,6 +307,7 @@
         }
         return total;
     }
+    window.getTotalStars = getTotalStars;
 
     function isLevelUnlocked(lvlNum) {
         if (lvlNum === 1) return true;
@@ -404,6 +405,281 @@
                 grid.appendChild(card);
             }
         }
+    }
+
+    // --- GARAGE & SKINS CONTROLLER ---
+    let selectedGarageSkinId = window.skinManager ? window.skinManager.getActiveSkin().id : 'classic';
+    let garageAnimFrameId = null;
+    let garagePreviewParticles = [];
+
+    function openGarage() {
+        const modal = document.getElementById('garageModal');
+        if (!modal) return;
+        selectedGarageSkinId = window.skinManager ? window.skinManager.getActiveSkin().id : 'classic';
+        updateGarageUI();
+        modal.classList.add('active');
+        startGaragePreview();
+        window.sounds.playClick();
+    }
+
+    function closeGarage() {
+        const modal = document.getElementById('garageModal');
+        if (modal) modal.classList.remove('active');
+        if (garageAnimFrameId) {
+            cancelAnimationFrame(garageAnimFrameId);
+            garageAnimFrameId = null;
+        }
+    }
+
+    function toggleGarage() {
+        const modal = document.getElementById('garageModal');
+        if (!modal) return;
+        if (modal.classList.contains('active')) {
+            closeGarage();
+        } else {
+            openGarage();
+        }
+    }
+
+    function selectGarageSkin(skinId) {
+        selectedGarageSkinId = skinId;
+        updateGarageUI();
+        window.sounds.playClick();
+    }
+
+    function updateGarageUI() {
+        const totalStars = getTotalStars();
+        const badge = document.getElementById('garageStarsBadge');
+        if (badge) badge.textContent = `⭐ ${totalStars} / 300 Estrellas`;
+
+        const skin = window.BIKE_SKINS ? window.BIKE_SKINS.find(s => s.id === selectedGarageSkinId) : null;
+        if (!skin) return;
+
+        const isUnlocked = window.skinManager ? window.skinManager.isUnlocked(skin.id) : (skin.requiredStars === 0);
+        const isEquipped = window.skinManager ? (window.skinManager.getActiveSkin().id === skin.id) : false;
+
+        const nameEl = document.getElementById('previewBikeName');
+        const taglineEl = document.getElementById('previewBikeTagline');
+        const statusEl = document.getElementById('previewBikeLockStatus');
+        const btnEquip = document.getElementById('btnEquipBike');
+
+        if (nameEl) nameEl.textContent = skin.name;
+        if (taglineEl) taglineEl.textContent = skin.tagline;
+
+        if (statusEl) {
+            if (isEquipped) {
+                statusEl.textContent = '✅ EN USO';
+                statusEl.className = 'bike-status-badge unlocked';
+            } else if (isUnlocked) {
+                statusEl.textContent = '✅ DESBLOQUEADA';
+                statusEl.className = 'bike-status-badge unlocked';
+            } else {
+                const diff = skin.requiredStars - totalStars;
+                statusEl.textContent = `🔒 ${skin.requiredStars} ⭐ (Faltan ${diff > 0 ? diff : 0})`;
+                statusEl.className = 'bike-status-badge locked';
+            }
+        }
+
+        if (btnEquip) {
+            if (isEquipped) {
+                btnEquip.textContent = 'EQUIPADA';
+                btnEquip.disabled = true;
+                btnEquip.className = 'btn-secondary';
+            } else if (isUnlocked) {
+                btnEquip.textContent = 'EQUIPAR MOTO';
+                btnEquip.disabled = false;
+                btnEquip.className = 'btn-primary';
+                btnEquip.onclick = () => {
+                    if (window.skinManager) {
+                        window.skinManager.setActiveSkin(skin.id);
+                        updateGarageUI();
+                        window.sounds.playClick();
+                    }
+                };
+            } else {
+                btnEquip.textContent = 'BLOQUEADA';
+                btnEquip.disabled = true;
+                btnEquip.className = 'btn-secondary';
+                btnEquip.onclick = null;
+            }
+        }
+
+        // Render bikes grid cards
+        const grid = document.getElementById('garageBikesGrid');
+        if (grid && window.BIKE_SKINS) {
+            grid.innerHTML = '';
+            const skinIcons = {
+                'classic': '🏍️',
+                'fire_demon': '👹',
+                'police': '🚓',
+                'ninja': '🥷',
+                'cyber': '⚡',
+                'ghost': '💀',
+                'golden': '👑'
+            };
+
+            BIKE_SKINS.forEach(s => {
+                const unlocked = window.skinManager ? window.skinManager.isUnlocked(s.id) : (s.requiredStars === 0);
+                const equipped = window.skinManager ? (window.skinManager.getActiveSkin().id === s.id) : false;
+                const isSelected = (s.id === selectedGarageSkinId);
+
+                const card = document.createElement('div');
+                card.className = `garage-bike-card ${isSelected ? 'active' : ''} ${equipped ? 'equipped' : ''} ${unlocked ? '' : 'locked'}`;
+
+                const icon = skinIcons[s.id] || '🏍️';
+                const starsText = s.requiredStars === 0 ? 'Gratis' : `⭐ ${s.requiredStars}`;
+
+                card.innerHTML = `
+                    <div class="card-bike-icon">${icon}</div>
+                    <div class="card-bike-name">${s.name}</div>
+                    <div class="card-bike-stars">${unlocked ? (equipped ? '★ En uso' : '✓ Libre') : starsText}</div>
+                `;
+
+                card.onclick = () => {
+                    selectGarageSkin(s.id);
+                };
+
+                grid.appendChild(card);
+            });
+        }
+    }
+    window.updateGarageUI = updateGarageUI;
+
+    function startGaragePreview() {
+        if (garageAnimFrameId) {
+            cancelAnimationFrame(garageAnimFrameId);
+        }
+        garagePreviewParticles = [];
+        const canvasPreview = document.getElementById('garagePreviewCanvas');
+        if (!canvasPreview) return;
+        const pCtx = canvasPreview.getContext('2d');
+
+        function loop(timestamp) {
+            const modal = document.getElementById('garageModal');
+            if (!modal || !modal.classList.contains('active')) {
+                garageAnimFrameId = null;
+                return;
+            }
+
+            pCtx.clearRect(0, 0, canvasPreview.width, canvasPreview.height);
+
+            const skin = window.BIKE_SKINS ? window.BIKE_SKINS.find(s => s.id === selectedGarageSkinId) : null;
+            if (skin) {
+                // Background subtle podium glow
+                const grad = pCtx.createRadialGradient(240, 130, 20, 240, 130, 220);
+                grad.addColorStop(0, (skin.colors.accent || '#8a2be2') + '33');
+                grad.addColorStop(1, 'rgba(10, 5, 15, 0.85)');
+                pCtx.fillStyle = grad;
+                pCtx.fillRect(0, 0, canvasPreview.width, canvasPreview.height);
+
+                // Grid floor lines for high tech feel
+                pCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                pCtx.lineWidth = 1;
+                for (let x = 40; x < canvasPreview.width; x += 40) {
+                    pCtx.beginPath();
+                    pCtx.moveTo(x, 150);
+                    pCtx.lineTo(x + (x - 240) * 0.45, 230);
+                    pCtx.stroke();
+                }
+                for (let y = 150; y < 230; y += 20) {
+                    pCtx.beginPath();
+                    pCtx.moveTo(0, y);
+                    pCtx.lineTo(canvasPreview.width, y);
+                    pCtx.stroke();
+                }
+
+                // Smooth idle hover suspension bounce
+                const bounce = Math.sin(timestamp * 0.0035) * 3;
+                const bikeY = 126 + bounce;
+                const bikeX = 240;
+                const wheelAngle = timestamp * 0.003;
+
+                // Ground shadow beneath bike
+                pCtx.save();
+                pCtx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                pCtx.beginPath();
+                pCtx.ellipse(bikeX, 168, 66 - bounce * 1.5, 9, 0, 0, Math.PI * 2);
+                pCtx.fill();
+                pCtx.restore();
+
+                // Emit preview exhaust particles
+                if (Math.random() < 0.45) {
+                    const exX = bikeX - 34;
+                    const exY = bikeY + 2;
+                    let pColor = '#ff6600';
+                    let pSize = 3 + Math.random() * 3;
+                    const pType = skin.particleType || 'smoke';
+                    if (pType === 'fire') {
+                        pColor = ['#ff0000', '#ff3300', '#ff8800', '#ffee00'][Math.floor(Math.random() * 4)];
+                    } else if (pType === 'police_siren') {
+                        pColor = Math.random() < 0.5 ? '#ff0033' : '#0066ff';
+                    } else if (pType === 'plasma_green') {
+                        pColor = Math.random() < 0.6 ? '#00ff44' : '#aaff00';
+                    } else if (pType === 'cyber_trail') {
+                        pColor = Math.random() < 0.5 ? '#00f0ff' : '#ff0077';
+                    } else if (pType === 'ghost_aura') {
+                        pColor = Math.random() < 0.5 ? '#9d4edd' : '#e0aaff';
+                    } else if (pType === 'gold_sparkles') {
+                        pColor = Math.random() < 0.4 ? '#ffffff' : '#ffd700';
+                    }
+
+                    garagePreviewParticles.push({
+                        x: exX,
+                        y: exY,
+                        vx: -1.5 - Math.random() * 2,
+                        vy: (Math.random() - 0.5) * 1.2,
+                        size: pSize,
+                        color: pColor,
+                        alpha: 0.85,
+                        decay: 0.03
+                    });
+                }
+
+                // Render and update preview particles
+                for (let i = garagePreviewParticles.length - 1; i >= 0; i--) {
+                    const p = garagePreviewParticles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= p.decay;
+                    if (p.alpha <= 0) {
+                        garagePreviewParticles.splice(i, 1);
+                        continue;
+                    }
+                    pCtx.save();
+                    pCtx.globalAlpha = p.alpha;
+                    pCtx.fillStyle = p.color;
+                    pCtx.beginPath();
+                    pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    pCtx.fill();
+                    pCtx.restore();
+                }
+
+                // Fake bike state for preview
+                const previewBikeState = {
+                    chassis: {
+                        position: { x: bikeX, y: bikeY },
+                        angle: 0
+                    },
+                    rearWheel: {
+                        position: { x: bikeX - 49, y: bikeY + 14 },
+                        angle: wheelAngle,
+                        circleRadius: 21
+                    },
+                    frontWheel: {
+                        position: { x: bikeX + 49, y: bikeY + 14 },
+                        angle: wheelAngle,
+                        circleRadius: 21
+                    },
+                    isAlive: true
+                };
+
+                drawBike(skin, pCtx, previewBikeState);
+            }
+
+            garageAnimFrameId = requestAnimationFrame(loop);
+        }
+
+        garageAnimFrameId = requestAnimationFrame(loop);
     }
 
     // --- LEVEL MANAGEMENT ---
@@ -572,6 +848,7 @@
         if (crashModal) crashModal.classList.remove('active');
         if (victoryModal) victoryModal.classList.remove('active');
         if (mapModal) mapModal.classList.remove('active');
+        closeGarage();
     }
 
     // --- CONTROLS & PHYSICS UPDATE ---
@@ -591,8 +868,13 @@
                 e.preventDefault();
                 toggleLevelMap();
             }
+            if (e.key === 'g' || e.key === 'G') {
+                e.preventDefault();
+                toggleGarage();
+            }
             if (e.key === 'Escape') {
                 closeLevelMap();
+                closeGarage();
             }
         });
 
@@ -702,20 +984,54 @@
             // Slight wheelie torque when giving gas on ground
             Body.applyForce(chassis, chassis.position, { x: 0.008, y: -0.002 });
 
-            // Exhaust particles
-            if (Math.random() < 0.6) {
+            // Exhaust particles with skin-specific effects
+            if (Math.random() < 0.65) {
                 const angle = chassis.angle;
                 const exhaustX = chassis.position.x - Math.cos(angle) * 32;
                 const exhaustY = chassis.position.y - Math.sin(angle) * 32 + 4;
+                const activeSkin = window.skinManager ? window.skinManager.getActiveSkin() : (window.BIKE_SKINS ? window.BIKE_SKINS[0] : null);
+                const pType = activeSkin ? (activeSkin.particleType || 'smoke') : 'smoke';
+
+                let pColor = Math.random() < 0.3 ? '#ff6600' : 'rgba(200, 200, 200, 0.7)';
+                let pVx = -Math.cos(angle) * (3 + Math.random() * 4) + (Math.random() - 0.5) * 2;
+                let pVy = -Math.sin(angle) * (3 + Math.random() * 4) + (Math.random() - 0.5) * 2;
+                let pSize = Math.random() * 4 + 2;
+                let pDecay = 0.035;
+
+                if (pType === 'fire') {
+                    pColor = ['#ff0000', '#ff3300', '#ff8800', '#ffee00'][Math.floor(Math.random() * 4)];
+                    pSize = Math.random() * 5 + 3;
+                    pDecay = 0.04;
+                } else if (pType === 'police_siren') {
+                    pColor = Math.random() < 0.5 ? '#ff0033' : '#0066ff';
+                    pSize = Math.random() * 4 + 2.5;
+                } else if (pType === 'plasma_green') {
+                    pColor = Math.random() < 0.6 ? '#00ff44' : '#aaff00';
+                    pSize = Math.random() * 4 + 2.5;
+                } else if (pType === 'cyber_trail') {
+                    pColor = Math.random() < 0.5 ? '#00f0ff' : '#ff0077';
+                    pSize = Math.random() * 3.5 + 2;
+                    pDecay = 0.025;
+                } else if (pType === 'ghost_aura') {
+                    pColor = Math.random() < 0.5 ? '#9d4edd' : '#e0aaff';
+                    pVy -= 1.8; // Ghostly soul mist rises up
+                    pSize = Math.random() * 5 + 2;
+                    pDecay = 0.03;
+                } else if (pType === 'gold_sparkles') {
+                    pColor = Math.random() < 0.4 ? '#ffffff' : (Math.random() < 0.7 ? '#ffd700' : '#ffe066');
+                    pSize = Math.random() * 4 + 1.5;
+                    pDecay = 0.03;
+                }
+
                 particles.push({
                     x: exhaustX,
                     y: exhaustY,
-                    vx: -Math.cos(angle) * (3 + Math.random() * 4) + (Math.random() - 0.5) * 2,
-                    vy: -Math.sin(angle) * (3 + Math.random() * 4) + (Math.random() - 0.5) * 2,
-                    size: Math.random() * 4 + 2,
-                    color: Math.random() < 0.3 ? '#ff6600' : 'rgba(200, 200, 200, 0.7)',
-                    alpha: 0.8,
-                    decay: 0.035
+                    vx: pVx,
+                    vy: pVy,
+                    size: pSize,
+                    color: pColor,
+                    alpha: 0.85,
+                    decay: pDecay
                 });
             }
         }
@@ -983,335 +1299,888 @@
         }
     }
 
-    function drawBike() {
-        const chassis = bike.chassis;
-        const rear = bike.rearWheel;
-        const front = bike.frontWheel;
+    function drawBike(targetSkin, targetCtx, targetBikeState) {
+        const c = targetCtx || ctx;
+        const b = targetBikeState || bike;
+        if (!b || !b.chassis) return;
 
-        // 1. Draw Wheels at physical body locations with rolling rotation
-        drawWheel(rear);
-        drawWheel(front);
+        const skin = targetSkin || (window.skinManager ? window.skinManager.getActiveSkin() : (window.BIKE_SKINS ? window.BIKE_SKINS[0] : null));
+        if (!skin) return;
 
-        // 2. Draw Motocross Frame, Plastics, Engine, Suspension & Rider
-        ctx.save();
-        ctx.translate(chassis.position.x, chassis.position.y);
-        ctx.rotate(chassis.angle);
+        const colors = skin.colors || {};
+        const shape = skin.shape || 'motocross';
 
-        // Rear Heavy-Duty Swingarm
-        ctx.strokeStyle = '#181818';
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-10, 6);
-        ctx.lineTo(-49, 14);
-        ctx.stroke();
+        const chassis = b.chassis;
+        const rear = b.rearWheel;
+        const front = b.frontWheel;
 
-        // Rear Monoshock with bright red coil spring
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#cccccc'; // Damper rod
-        ctx.beginPath();
-        ctx.moveTo(-10, -6);
-        ctx.lineTo(-30, 10);
-        ctx.stroke();
+        // 1. Draw Wheels at physical or simulated locations with custom skin & wheelType
+        if (rear) drawWheel(rear, skin, c);
+        if (front) drawWheel(front, skin, c);
+
+        // 2. Draw Frame, Plastics, Suspension, Engine & Rider
+        c.save();
+        c.translate(chassis.position.x, chassis.position.y);
+        c.rotate(chassis.angle);
+
+        // Rear Swingarm
+        c.strokeStyle = '#181818';
+        c.lineWidth = 7;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(-10, 6);
+        c.lineTo(-49, 14);
+        c.stroke();
+
+        // Rear Monoshock damper rod
+        c.lineWidth = 3;
+        c.strokeStyle = colors.sliders || '#cccccc';
+        c.beginPath();
+        c.moveTo(-10, -6);
+        c.lineTo(-30, 10);
+        c.stroke();
 
         // Coiled Spring around shock
-        ctx.strokeStyle = '#ff2200';
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
+        c.strokeStyle = colors.spring || '#ff2200';
+        c.lineWidth = 3.5;
+        c.beginPath();
         const shockSteps = 5;
         for (let i = 0; i <= shockSteps; i++) {
             const t = i / shockSteps;
             const sx = -10 + (-30 - (-10)) * t;
             const sy = -6 + (10 - (-6)) * t;
             const offset = (i % 2 === 0 ? -4 : 4);
-            if (i === 0) ctx.moveTo(sx, sy);
-            else ctx.lineTo(sx + offset, sy);
+            if (i === 0) c.moveTo(sx, sy);
+            else c.lineTo(sx + offset, sy);
         }
-        ctx.stroke();
+        c.stroke();
 
         // Rear Chain & Sprocket
-        ctx.fillStyle = '#111';
-        ctx.beginPath();
-        ctx.arc(-49, 14, 11, 0, Math.PI * 2);
-        ctx.fill();
+        c.fillStyle = '#111';
+        c.beginPath();
+        c.arc(-49, 14, 11, 0, Math.PI * 2);
+        c.fill();
 
-        ctx.strokeStyle = '#888888';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-49, 3);
-        ctx.lineTo(-10, -1);
-        ctx.moveTo(-49, 25);
-        ctx.lineTo(-10, 13);
-        ctx.stroke();
+        c.strokeStyle = '#888888';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(-49, 3);
+        c.lineTo(-10, -1);
+        c.moveTo(-49, 25);
+        c.lineTo(-10, 13);
+        c.stroke();
 
-        // Front Upside-Down Suspension Forks (Stanchions & Chrome sliders)
-        // Golden upper forks
-        ctx.strokeStyle = '#d4a017';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(28, -22);
-        ctx.lineTo(39, -4);
-        ctx.stroke();
+        // Front Upside-Down Suspension Forks
+        // Upper forks
+        c.strokeStyle = colors.forks || '#d4a017';
+        c.lineWidth = 6;
+        c.beginPath();
+        c.moveTo(28, -22);
+        c.lineTo(39, -4);
+        c.stroke();
 
-        // Chrome lower sliders
-        ctx.strokeStyle = '#e6e6e6';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(39, -4);
-        ctx.lineTo(49, 14);
-        ctx.stroke();
+        // Lower sliders
+        c.strokeStyle = colors.sliders || '#e6e6e6';
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(39, -4);
+        c.lineTo(49, 14);
+        c.stroke();
 
         // Fork guards / brake mount
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(44, 4, 6, 8);
+        c.fillStyle = colors.body || '#0a0a0a';
+        c.fillRect(44, 4, 6, 8);
 
-        // Engine Crankcase & Cylinder with cooling fins
-        ctx.fillStyle = '#1f1f1f';
-        ctx.beginPath();
-        ctx.arc(-2, 8, 12, 0, Math.PI * 2);
-        ctx.fill();
+        // Engine Bay: Crankcase, Cooling fins, or custom Core
+        if (shape === 'ghost') {
+            // Skeletal vertebrae & ribcage engine
+            c.fillStyle = '#e8e4db';
+            c.beginPath();
+            c.arc(-2, 6, 11, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = '#f0ede6';
+            c.lineWidth = 2.8;
+            for (let r = 0; r < 4; r++) {
+                c.beginPath();
+                c.arc(-10 + r * 6, 4, 8, 0.4, 2.5);
+                c.stroke();
+            }
+        } else if (shape === 'cyber') {
+            // Cyber pulse reactor core
+            c.fillStyle = '#080014';
+            c.beginPath();
+            c.arc(-2, 8, 13, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = colors.accent || '#00f0ff';
+            c.lineWidth = 2;
+            c.stroke();
+            c.fillStyle = colors.secondaryAccent || '#ff0077';
+            c.beginPath();
+            c.arc(-2, 8, 6, 0, Math.PI * 2);
+            c.fill();
+        } else {
+            // Performance engine crankcase & cooling fins
+            c.fillStyle = '#1f1f1f';
+            c.beginPath();
+            c.arc(-2, 8, 12, 0, Math.PI * 2);
+            c.fill();
 
-        ctx.fillStyle = '#2c2c2c';
-        // Cooling fins
-        for (let f = 0; f < 4; f++) {
-            ctx.fillRect(4, -3 + f * 3, 10, 1.8);
+            c.fillStyle = '#2c2c2c';
+            for (let f = 0; f < 4; f++) {
+                c.fillRect(4, -3 + f * 3, 10, 1.8);
+            }
         }
 
-        // Exhaust Header Pipe & Upswept Motocross Muffler
-        ctx.strokeStyle = '#b87333'; // Heat-colored bronze/copper
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(10, 0);
-        ctx.quadraticCurveTo(8, 14, -2, 14);
-        ctx.lineTo(-18, 6);
-        ctx.stroke();
+        // Exhaust Header Pipe
+        c.strokeStyle = colors.exhaust || '#b87333';
+        c.lineWidth = 4;
+        c.beginPath();
+        c.moveTo(10, 0);
+        c.quadraticCurveTo(8, 14, -2, 14);
+        c.lineTo(-18, 6);
+        c.stroke();
 
-        // Muffler canister
-        ctx.fillStyle = '#444444';
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-20, 7);
-        ctx.lineTo(-58, -8);
-        ctx.lineTo(-56, -16);
-        ctx.lineTo(-18, -1);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        // Custom Muffler by Shape
+        if (shape === 'demon') {
+            // Demon dual undertail magma exhausts
+            c.fillStyle = '#ff1100';
+            c.beginPath();
+            c.moveTo(-20, 7);
+            c.lineTo(-64, -12);
+            c.lineTo(-60, -20);
+            c.lineTo(-18, -1);
+            c.closePath();
+            c.fill();
+            c.fillStyle = '#ff9900';
+            c.fillRect(-66, -16, 4, 6);
+        } else if (shape === 'golden') {
+            // Dual polished 24K gold megaphone exhausts
+            c.fillStyle = '#ffd700';
+            c.strokeStyle = '#ffffff';
+            c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(-20, 7);
+            c.lineTo(-62, -10);
+            c.lineTo(-60, -22);
+            c.lineTo(-18, -1);
+            c.closePath();
+            c.fill();
+            c.stroke();
+            c.fillStyle = '#ffffff';
+            c.fillRect(-64, -18, 3, 7);
+        } else {
+            // Standard upswept canister muffler
+            c.fillStyle = colors.muffler || '#444444';
+            c.strokeStyle = '#111111';
+            c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(-20, 7);
+            c.lineTo(-58, -8);
+            c.lineTo(-56, -16);
+            c.lineTo(-18, -1);
+            c.closePath();
+            c.fill();
+            c.stroke();
+            c.fillStyle = colors.accent || '#ff5500';
+            c.fillRect(-59, -13, 3, 4);
+        }
 
-        // Muffler tip
-        ctx.fillStyle = '#ff5500';
-        ctx.fillRect(-59, -13, 3, 4);
+        // --- DISTINCT BODYWORK SILHOUETTE PER SKIN SHAPE ---
+        if (shape === 'motocross') {
+            // 1. CLASSIC MOTOCROSS DIRTBIKE
+            c.fillStyle = colors.body || '#0a0a0a';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(8, -16);
+            c.lineTo(-36, -16);
+            c.lineTo(-78, -32); // High pointed dirt rear fender
+            c.lineTo(-70, -20);
+            c.lineTo(-30, -8);
+            c.lineTo(-12, 4);
+            c.lineTo(12, 4);
+            c.lineTo(24, -14);
+            c.closePath();
+            c.fill();
 
-        // Motocross Body Plastics & Tank (Sharp, aggressive silhouette)
-        ctx.fillStyle = '#0a0a0a';
-        ctx.beginPath();
-        ctx.moveTo(28, -22); // Triple clamp
-        ctx.lineTo(8, -16);  // Tank dip
-        ctx.lineTo(-36, -16); // Seat bed
-        ctx.lineTo(-78, -32); // High pointed rear fender tip!
-        ctx.lineTo(-70, -20); // Rear fender bottom edge
-        ctx.lineTo(-30, -8);  // Side number plate
-        ctx.lineTo(-12, 4);   // Frame pivot
-        ctx.lineTo(12, 4);    // Front cradle
-        ctx.lineTo(24, -14);  // Shroud front
-        ctx.closePath();
-        ctx.fill();
+            // High Motocross Front Beak
+            c.beginPath();
+            c.moveTo(26, -20);
+            c.lineTo(70, -28); // Dirt beak over front wheel
+            c.lineTo(66, -21);
+            c.lineTo(28, -14);
+            c.closePath();
+            c.fill();
 
-        // Signature High Motocross Front Fender (Beak / Guardabarros delantero)
-        ctx.fillStyle = '#0a0a0a';
-        ctx.beginPath();
-        ctx.moveTo(26, -20);
-        ctx.lineTo(70, -28); // Sharp beak extending way over front wheel!
-        ctx.lineTo(66, -21);
-        ctx.lineTo(28, -14);
-        ctx.closePath();
-        ctx.fill();
+            // Racing Accent Decals
+            c.strokeStyle = colors.accent || '#ff5500';
+            c.lineWidth = 2.5;
+            c.beginPath();
+            c.moveTo(26, -20);
+            c.lineTo(70, -28);
+            c.moveTo(22, -18);
+            c.lineTo(6, -14);
+            c.lineTo(14, -4);
+            c.moveTo(-34, -16);
+            c.lineTo(-78, -32);
+            c.stroke();
 
-        // Bold Orange Racing Accents (Signature Bike Race Style)
-        ctx.strokeStyle = '#ff5500';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        // Front fender edge
-        ctx.moveTo(26, -20);
-        ctx.lineTo(70, -28);
-        // Tank shroud decal
-        ctx.moveTo(22, -18);
-        ctx.lineTo(6, -14);
-        ctx.lineTo(14, -4);
-        // Rear fender top edge
-        ctx.moveTo(-34, -16);
-        ctx.lineTo(-78, -32);
-        ctx.stroke();
+            // Flat Gripper Seat
+            c.fillStyle = colors.seat || '#1c1c1c';
+            c.beginPath();
+            c.moveTo(6, -16);
+            c.lineTo(-36, -16);
+            c.lineTo(-34, -20);
+            c.lineTo(4, -20);
+            c.closePath();
+            c.fill();
 
-        // Motocross Flat Gripper Seat
-        ctx.fillStyle = '#1c1c1c';
-        ctx.beginPath();
-        ctx.moveTo(6, -16);
-        ctx.lineTo(-36, -16);
-        ctx.lineTo(-34, -20);
-        ctx.lineTo(4, -20);
-        ctx.closePath();
-        ctx.fill();
+            // Handlebars & Crossbar
+            c.strokeStyle = '#111111';
+            c.lineWidth = 4;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(22, -42);
+            c.stroke();
 
-        // Handlebars & Crossbar
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(28, -22);
-        ctx.lineTo(22, -42);
-        ctx.stroke();
+            c.lineWidth = 2.5;
+            c.strokeStyle = '#888';
+            c.beginPath();
+            c.moveTo(24, -36);
+            c.lineTo(21, -36);
+            c.stroke();
 
-        // Crossbar
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#888';
-        ctx.beginPath();
-        ctx.moveTo(24, -36);
-        ctx.lineTo(21, -36);
-        ctx.stroke();
+            c.fillStyle = colors.accent || '#ff5500';
+            c.fillRect(19, -44, 6, 4);
 
-        // Rubber grips
-        ctx.fillStyle = '#ff5500';
-        ctx.fillRect(19, -44, 6, 4);
+        } else if (shape === 'demon') {
+            // 2. FURIA CARMESÍ - DEMON DOUBLE-HORN FIN BIKE
+            c.fillStyle = colors.body || '#140003';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(8, -16);
+            c.lineTo(-30, -18);
+            c.lineTo(-84, -46); // Upper devil horn fin
+            c.lineTo(-72, -32); // Inner notch
+            c.lineTo(-86, -22); // Lower sharp stinger fin
+            c.lineTo(-32, -8);
+            c.lineTo(-12, 4);
+            c.lineTo(14, 4);
+            c.lineTo(24, -14);
+            c.closePath();
+            c.fill();
+
+            // Razor-Serrated Front Demon Beak
+            c.beginPath();
+            c.moveTo(26, -20);
+            c.lineTo(76, -34); // Upper horn
+            c.lineTo(64, -26); // Notch
+            c.lineTo(72, -22); // Lower claw
+            c.lineTo(28, -14);
+            c.closePath();
+            c.fill();
+
+            // Crimson Edge Accents
+            c.strokeStyle = colors.accent || '#ff0033';
+            c.lineWidth = 3;
+            c.beginPath();
+            c.moveTo(26, -20);
+            c.lineTo(76, -34);
+            c.moveTo(-30, -18);
+            c.lineTo(-84, -46);
+            c.moveTo(-72, -32);
+            c.lineTo(-86, -22);
+            c.stroke();
+
+            // Demon Seat
+            c.fillStyle = colors.seat || '#2b0007';
+            c.beginPath();
+            c.moveTo(6, -16);
+            c.lineTo(-30, -18);
+            c.lineTo(-28, -22);
+            c.lineTo(4, -21);
+            c.closePath();
+            c.fill();
+
+            // Aggressive Horn Bars
+            c.strokeStyle = '#ff0033';
+            c.lineWidth = 4;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(22, -42);
+            c.lineTo(16, -46);
+            c.stroke();
+
+        } else if (shape === 'police') {
+            // 3. PATRULLA INTERCEPTOR - HIGHWAY PATROL PURSUIT
+            // Translucent blue pursuit windshield
+            c.fillStyle = 'rgba(0, 180, 255, 0.45)';
+            c.beginPath();
+            c.moveTo(26, -22);
+            c.lineTo(36, -50); // Tall windshield
+            c.lineTo(28, -52);
+            c.lineTo(18, -24);
+            c.closePath();
+            c.fill();
+            c.strokeStyle = '#00f0ff';
+            c.lineWidth = 1.5;
+            c.stroke();
+
+            // White Highway Patrol Fairing
+            c.fillStyle = colors.body || '#ffffff';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(54, -16); // Rounded patrol nose
+            c.lineTo(46, 2);   // Lower crash cowl
+            c.lineTo(16, 4);
+            c.lineTo(-32, -14);
+            c.lineTo(-36, -18);
+            c.closePath();
+            c.fill();
+
+            // Police Deep Blue Lower & Side Stripe
+            c.fillStyle = colors.accent || '#0055ff';
+            c.beginPath();
+            c.moveTo(24, -14);
+            c.lineTo(50, -12);
+            c.lineTo(44, -2);
+            c.lineTo(20, -2);
+            c.closePath();
+            c.fill();
+
+            // Police Radio Trunk Box at the back
+            c.fillStyle = '#0a1d37';
+            c.fillRect(-64, -28, 28, 18);
+            c.strokeStyle = '#ffffff';
+            c.lineWidth = 1.5;
+            c.strokeRect(-64, -28, 28, 18);
+
+            // Siren Beacon Pole
+            c.strokeStyle = '#cccccc';
+            c.lineWidth = 3;
+            c.beginPath();
+            c.moveTo(-60, -28);
+            c.lineTo(-60, -42);
+            c.stroke();
+
+            // ACTIVE FLASHING EMERGENCY LED BEACON (alternates red & blue every 180ms)
+            const isRed = (performance.now() % 360) < 180;
+            const sirenColor = isRed ? '#ff0033' : '#0066ff';
+            const sirenAura = isRed ? 'rgba(255, 0, 50, 0.65)' : 'rgba(0, 100, 255, 0.65)';
+
+            // Glowing light aura
+            c.fillStyle = sirenAura;
+            c.beginPath();
+            c.arc(-60, -44, 9, 0, Math.PI * 2);
+            c.fill();
+
+            // Emergency Strobe bulb
+            c.fillStyle = sirenColor;
+            c.beginPath();
+            c.arc(-60, -44, 4.5, 0, Math.PI * 2);
+            c.fill();
+
+            // Front Siren / Speaker
+            c.fillStyle = '#888888';
+            c.beginPath();
+            c.arc(42, -6, 5, 0, Math.PI * 2);
+            c.fill();
+
+            // Police Seat
+            c.fillStyle = colors.seat || '#002266';
+            c.fillRect(-34, -21, 38, 5);
+
+            // Police Cruiser Bars
+            c.strokeStyle = '#dddddd';
+            c.lineWidth = 4;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(20, -40);
+            c.stroke();
+
+        } else if (shape === 'supersport') {
+            // 4. SUPERBIKE NINJA ZX - AERODYNAMIC RACE FAIRING
+            c.fillStyle = colors.body || '#081408';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(62, -14); // Sleek bullet nose
+            c.lineTo(54, 8);   // Lower aerodynamic chin
+            c.lineTo(8, 12);   // Full bellypan under engine
+            c.lineTo(-26, 8);
+            c.lineTo(-72, -24); // High aerodynamic ducktail race cowl
+            c.lineTo(-66, -14);
+            c.lineTo(-24, -14);
+            c.closePath();
+            c.fill();
+
+            // Smoked Aerodynamic Bubble Windscreen
+            c.fillStyle = 'rgba(0, 40, 20, 0.7)';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(46, -34); // Race bubble screen
+            c.lineTo(34, -36);
+            c.lineTo(22, -26);
+            c.closePath();
+            c.fill();
+
+            // High-Vis Neon Green Racing Livery Stripes
+            c.strokeStyle = colors.accent || '#00ff44';
+            c.lineWidth = 3;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(62, -14);
+            c.moveTo(42, -6);
+            c.lineTo(16, 6);
+            c.lineTo(-20, 6);
+            c.moveTo(-30, -16);
+            c.lineTo(-72, -24);
+            c.stroke();
+
+            // Aerodynamic Race Winglet
+            c.fillStyle = colors.accent || '#00ff44';
+            c.fillRect(36, -8, 12, 3);
+
+            // Race Pad Seat
+            c.fillStyle = colors.seat || '#0d240d';
+            c.beginPath();
+            c.moveTo(10, -18);
+            c.lineTo(-30, -16);
+            c.lineTo(-28, -21);
+            c.lineTo(8, -21);
+            c.closePath();
+            c.fill();
+
+            // Low Clip-On Race Handlebars (Aggressive tuck)
+            c.strokeStyle = '#111';
+            c.lineWidth = 3.5;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(25, -34);
+            c.stroke();
+            c.fillStyle = colors.accent || '#00ff44';
+            c.fillRect(23, -36, 5, 4);
+
+        } else if (shape === 'cyber') {
+            // 5. CYBERPUNK 2099 - LOW-SLUNG MONOCOQUE POD
+            c.fillStyle = colors.body || '#080014';
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(68, -12); // Long angular front pod
+            c.lineTo(60, 6);
+            c.lineTo(12, 10);
+            c.lineTo(-34, 8);
+            c.lineTo(-76, -18); // Low-slung square cyber tail
+            c.lineTo(-74, -8);
+            c.lineTo(-24, -12);
+            c.closePath();
+            c.fill();
+
+            // Holographic HUD Visor projection
+            c.strokeStyle = colors.accent || '#00f0ff';
+            c.lineWidth = 2;
+            c.beginPath();
+            c.moveTo(28, -20);
+            c.lineTo(44, -40);
+            c.lineTo(30, -36);
+            c.stroke();
+
+            // Telemetry lines on HUD visor
+            c.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+            c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(33, -27); c.lineTo(38, -27);
+            c.moveTo(36, -33); c.lineTo(41, -33);
+            c.stroke();
+
+            // Glowing Neon Circuit Traces
+            c.strokeStyle = colors.secondaryAccent || '#ff0077';
+            c.lineWidth = 2.5;
+            c.beginPath();
+            c.moveTo(60, -10);
+            c.lineTo(30, -10);
+            c.lineTo(14, 0);
+            c.lineTo(-30, 0);
+            c.lineTo(-70, -14);
+            c.stroke();
+
+            // Cyber Thruster Nozzle
+            c.fillStyle = colors.secondaryAccent || '#ff0077';
+            c.fillRect(-76, -16, 10, 8);
+            c.fillStyle = colors.accent || '#00f0ff';
+            c.fillRect(-78, -14, 3, 4);
+
+            // Cyber Seat
+            c.fillStyle = colors.seat || '#1f0033';
+            c.fillRect(-28, -18, 34, 5);
+
+            // Angular Cyber Steering
+            c.strokeStyle = colors.accent || '#00f0ff';
+            c.lineWidth = 3.5;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(24, -38);
+            c.stroke();
+
+        } else if (shape === 'ghost') {
+            // 6. FANTASMA DEL ABISMO - SKELETAL VERTEBRAE & SKULL
+            c.fillStyle = colors.body || '#f0ede6';
+            for (let v = 0; v < 6; v++) {
+                c.beginPath();
+                c.arc(20 - v * 14, -16, 6, 0, Math.PI * 2);
+                c.fill();
+            }
+
+            // Horned Beast Skull Cowl
+            c.beginPath();
+            c.moveTo(24, -20);
+            c.lineTo(66, -26); // Skull snout
+            c.lineTo(60, -12); // Underjaw
+            c.lineTo(42, -10);
+            c.lineTo(26, -10);
+            c.closePath();
+            c.fill();
+
+            // Glowing Amethyst Skull Eye
+            c.fillStyle = colors.secondaryAccent || '#c77dff';
+            c.beginPath();
+            c.arc(46, -19, 3.5, 0, Math.PI * 2);
+            c.fill();
+
+            // Ragged Phantom Tail Shroud
+            c.fillStyle = 'rgba(157, 78, 221, 0.45)';
+            c.beginPath();
+            c.moveTo(-36, -16);
+            c.lineTo(-84, -36);
+            c.lineTo(-74, -22);
+            c.lineTo(-88, -14);
+            c.lineTo(-44, -10);
+            c.closePath();
+            c.fill();
+
+            // Ghost Seat
+            c.fillStyle = colors.seat || '#240046';
+            c.fillRect(-30, -20, 32, 5);
+
+            // Bone Handlebars
+            c.strokeStyle = colors.body || '#f0ede6';
+            c.lineWidth = 4;
+            c.beginPath();
+            c.moveTo(26, -20);
+            c.lineTo(20, -42);
+            c.stroke();
+
+        } else if (shape === 'golden') {
+            // 7. TITÁN DE ORO VIP - 24K FACETED HYPERBIKE
+            const goldGrad = c.createLinearGradient(0, -35, 0, 10);
+            goldGrad.addColorStop(0, '#ffffff');
+            goldGrad.addColorStop(0.2, '#ffd700');
+            goldGrad.addColorStop(0.7, '#ffae00');
+            goldGrad.addColorStop(1, '#b37700');
+
+            c.fillStyle = goldGrad;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(68, -18); // Sharp hyperbike diamond nose
+            c.lineTo(60, 4);
+            c.lineTo(16, 8);
+            c.lineTo(-24, 6);
+            c.lineTo(-80, -28); // Diamond-cut sculpted rear cowl
+            c.lineTo(-68, -14);
+            c.lineTo(-22, -12);
+            c.closePath();
+            c.fill();
+
+            // Beveled diamond facet reflection lines
+            c.strokeStyle = '#ffffff';
+            c.lineWidth = 1.8;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(68, -18);
+            c.moveTo(20, -18);
+            c.lineTo(6, -10);
+            c.lineTo(-20, -10);
+            c.moveTo(-28, -14);
+            c.lineTo(-80, -28);
+            c.stroke();
+
+            // Shimmering diamond glint on body that sparkles
+            const shimmerT = (performance.now() * 0.003) % (Math.PI * 2);
+            const glintAlpha = 0.5 + Math.sin(shimmerT) * 0.5;
+            c.fillStyle = `rgba(255, 255, 255, ${glintAlpha})`;
+            c.beginPath();
+            c.arc(52, -16, 2.5, 0, Math.PI * 2);
+            c.fill();
+
+            // Gold quilted seat
+            c.fillStyle = colors.seat || '#664d00';
+            c.beginPath();
+            c.moveTo(8, -18);
+            c.lineTo(-32, -16);
+            c.lineTo(-30, -22);
+            c.lineTo(6, -22);
+            c.closePath();
+            c.fill();
+
+            // Polished Gold Handlebars
+            c.strokeStyle = '#ffd700';
+            c.lineWidth = 4;
+            c.beginPath();
+            c.moveTo(28, -22);
+            c.lineTo(22, -42);
+            c.stroke();
+            c.fillStyle = '#ffffff';
+            c.fillRect(19, -44, 6, 4);
+        }
 
         // Draw Rider on top of the bike (if alive)
-        if (bike.isAlive) {
-            drawRiderOnBike();
+        if (b.isAlive) {
+            drawRiderOnBike(skin, c);
         }
 
-        ctx.restore();
+        c.restore();
     }
 
-    function drawRiderOnBike() {
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+    function drawRiderOnBike(skin, customCtx) {
+        const c = customCtx || ctx;
+        c.save();
+        c.lineCap = 'round';
+        c.lineJoin = 'round';
+
+        const colors = skin ? (skin.colors || {}) : {};
+        const shape = skin ? (skin.shape || 'motocross') : 'motocross';
 
         // Foot & Motocross Boot on footpeg
-        ctx.fillStyle = '#050505';
-        ctx.beginPath();
-        ctx.moveTo(-6, 12);
-        ctx.lineTo(4, 12);
-        ctx.lineTo(2, 6);
-        ctx.lineTo(-6, 6);
-        ctx.closePath();
-        ctx.fill();
+        c.fillStyle = shape === 'golden' ? '#ffd700' : '#050505';
+        c.beginPath();
+        c.moveTo(-6, 12);
+        c.lineTo(4, 12);
+        c.lineTo(2, 6);
+        c.lineTo(-6, 6);
+        c.closePath();
+        c.fill();
 
         // Leg (Shin & bent knee hugging tank)
-        ctx.strokeStyle = '#080808';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.moveTo(-4, 8);
-        ctx.lineTo(8, -8);   // Knee
-        ctx.lineTo(-18, -18); // Hip on seat
-        ctx.stroke();
+        c.strokeStyle = shape === 'police' ? '#002266' : (shape === 'golden' ? '#241a00' : '#080808');
+        c.lineWidth = 8;
+        c.beginPath();
+        c.moveTo(-4, 8);
+        c.lineTo(8, -8);   // Knee
+        c.lineTo(-18, -18); // Hip on seat
+        c.stroke();
 
         // Torso in athletic attack position
-        ctx.lineWidth = 15;
-        ctx.beginPath();
-        ctx.moveTo(-18, -18); // Hip
-        ctx.lineTo(6, -44);   // Shoulder
-        ctx.stroke();
+        c.strokeStyle = shape === 'police' ? '#003399' : (shape === 'golden' ? '#ffd700' : (colors.body || '#080808'));
+        c.lineWidth = 15;
+        c.beginPath();
+        c.moveTo(-18, -18); // Hip
+        c.lineTo(6, -44);   // Shoulder
+        c.stroke();
 
         // Arm reaching forward to handlebars
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(6, -44);   // Shoulder
-        ctx.lineTo(16, -32);  // Elbow
-        ctx.lineTo(22, -42);  // Hand on grip
-        ctx.stroke();
+        c.lineWidth = 6;
+        c.strokeStyle = shape === 'police' ? '#002266' : (shape === 'golden' ? '#241a00' : '#080808');
+        c.beginPath();
+        c.moveTo(6, -44);   // Shoulder
+        c.lineTo(16, -32);  // Elbow
+        c.lineTo(22, -42);  // Hand on grip
+        c.stroke();
 
-        // Helmet & Head
         // Helmet shell
-        ctx.fillStyle = '#080808';
-        ctx.beginPath();
-        ctx.arc(8, -58, 14, 0, Math.PI * 2);
-        ctx.fill();
+        c.fillStyle = shape === 'police' ? '#ffffff' : (shape === 'ghost' ? '#f0ede6' : (shape === 'golden' ? '#ffd700' : (colors.body || '#080808')));
+        c.beginPath();
+        c.arc(8, -58, 14, 0, Math.PI * 2);
+        c.fill();
 
-        // Sharp Motocross Helmet Visor / Peak
-        ctx.beginPath();
-        ctx.moveTo(14, -66);
-        ctx.lineTo(36, -63); // Sun peak jutting forward!
-        ctx.lineTo(22, -59);
-        ctx.closePath();
-        ctx.fill();
+        // Special Police Helmet Badge
+        if (shape === 'police') {
+            c.fillStyle = '#ffd700';
+            c.beginPath();
+            c.arc(14, -62, 3.5, 0, Math.PI * 2);
+            c.fill();
+        }
+
+        // Helmet Visor / Peak
+        c.fillStyle = shape === 'police' ? '#003399' : (shape === 'ghost' ? '#9d4edd' : (colors.accent || '#080808'));
+        c.beginPath();
+        c.moveTo(14, -66);
+        c.lineTo(36, -63); // Sun peak jutting forward
+        c.lineTo(22, -59);
+        c.closePath();
+        c.fill();
 
         // Chin guard
-        ctx.beginPath();
-        ctx.moveTo(22, -50);
-        ctx.lineTo(12, -46);
-        ctx.lineTo(8, -50);
-        ctx.closePath();
-        ctx.fill();
+        c.beginPath();
+        c.moveTo(22, -50);
+        c.lineTo(12, -46);
+        c.lineTo(8, -50);
+        c.closePath();
+        c.fill();
 
-        // Signature Bright Yellow Goggles (From Bike Race Icon)
-        ctx.fillStyle = '#ffcc00';
-        ctx.beginPath();
-        ctx.ellipse(15, -57, 6.5, 4, 0.12, 0, Math.PI * 2);
-        ctx.fill();
+        // Goggles / Visor Lens
+        c.fillStyle = colors.goggles || '#ffcc00';
+        c.beginPath();
+        c.ellipse(15, -57, 6.5, 4, 0.12, 0, Math.PI * 2);
+        c.fill();
 
-        // Goggle glass reflection highlight
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(14, -58, 2.5, 1.2, 0.12, 0, Math.PI * 2);
-        ctx.fill();
+        // Goggle highlight
+        c.fillStyle = colors.goggleHighlight || '#ffffff';
+        c.beginPath();
+        c.ellipse(14, -58, 2.5, 1.2, 0.12, 0, Math.PI * 2);
+        c.fill();
 
-        ctx.restore();
+        c.restore();
     }
 
-    function drawWheel(wheel) {
-        ctx.save();
-        ctx.translate(wheel.position.x, wheel.position.y);
-        ctx.rotate(wheel.angle);
+    function drawWheel(wheel, skin, customCtx) {
+        const c = customCtx || ctx;
+        if (!wheel) return;
+        c.save();
+        c.translate(wheel.position.x, wheel.position.y);
+        c.rotate(wheel.angle);
 
         const r = wheel.circleRadius || 21;
+        const wType = skin ? (skin.wheelType || 'spokes') : 'spokes';
+        const colors = skin ? (skin.colors || {}) : {};
 
-        // Knobby Tire Treads (Dirtbike Knobs)
-        ctx.fillStyle = '#111111';
-        const numKnobs = 14;
-        for (let i = 0; i < numKnobs; i++) {
-            const angle = (i * Math.PI * 2) / numKnobs;
-            ctx.save();
-            ctx.rotate(angle);
-            ctx.fillRect(-2.5, -r - 3, 5, 3.5);
-            ctx.restore();
+        if (wType === 'disc_neon') {
+            // FUTURISTIC NEON PLASMA DISC WHEEL
+            c.fillStyle = '#06060c';
+            c.beginPath();
+            c.arc(0, 0, r + 1, 0, Math.PI * 2);
+            c.fill();
+
+            // Solid carbon disc body
+            c.fillStyle = '#0e0b16';
+            c.beginPath();
+            c.arc(0, 0, r * 0.88, 0, Math.PI * 2);
+            c.fill();
+
+            // Glowing outer neon plasma ring
+            c.strokeStyle = colors.rim || '#00f0ff';
+            c.lineWidth = 2.5;
+            c.beginPath();
+            c.arc(0, 0, r * 0.76, 0, Math.PI * 2);
+            c.stroke();
+
+            // Secondary neon circuit ring
+            c.strokeStyle = colors.spokes || '#ff0077';
+            c.lineWidth = 1.5;
+            c.beginPath();
+            c.arc(0, 0, r * 0.48, 0, Math.PI * 2);
+            c.stroke();
+
+            // 4 rotating neon circuit radial lines
+            c.lineWidth = 2;
+            c.strokeStyle = colors.rim || '#00f0ff';
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2;
+                c.beginPath();
+                c.moveTo(Math.cos(angle) * r * 0.2, Math.sin(angle) * r * 0.2);
+                c.lineTo(Math.cos(angle) * r * 0.74, Math.sin(angle) * r * 0.74);
+                c.stroke();
+            }
+
+            // Center glowing plasma hub
+            c.fillStyle = colors.spokes || '#ff0077';
+            c.beginPath();
+            c.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+            c.fill();
+
+        } else if (wType === 'gold_star') {
+            // LUXURY 24K 5-SPOKE GOLD STAR WHEEL
+            c.fillStyle = '#0d0d0d';
+            c.beginPath();
+            c.arc(0, 0, r + 1, 0, Math.PI * 2);
+            c.fill();
+
+            // Polished Gold Outer Rim Flange
+            c.strokeStyle = '#ffd700';
+            c.lineWidth = 3;
+            c.beginPath();
+            c.arc(0, 0, r * 0.82, 0, Math.PI * 2);
+            c.stroke();
+
+            // Dark inner wheel bed
+            c.fillStyle = '#1c1500';
+            c.beginPath();
+            c.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+            c.fill();
+
+            // 5-Spoke Sculpted Star Spokes
+            c.fillStyle = '#ffd700';
+            c.strokeStyle = '#ffffff';
+            c.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                const angle = (i * Math.PI * 2) / 5;
+                c.save();
+                c.rotate(angle);
+                c.beginPath();
+                c.moveTo(-3, 0);
+                c.lineTo(0, r * 0.8);
+                c.lineTo(3, 0);
+                c.closePath();
+                c.fill();
+                c.stroke();
+                c.restore();
+            }
+
+            // Center diamond hub
+            c.fillStyle = '#ffffff';
+            c.beginPath();
+            c.arc(0, 0, r * 0.26, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = '#ffd700';
+            c.lineWidth = 1.5;
+            c.stroke();
+
+        } else {
+            // CLASSIC SPOKES & KNOBBY TIRE
+            // Knobby Tire Treads (Dirtbike Knobs)
+            c.fillStyle = '#111111';
+            const numKnobs = 14;
+            for (let i = 0; i < numKnobs; i++) {
+                const angle = (i * Math.PI * 2) / numKnobs;
+                c.save();
+                c.rotate(angle);
+                c.fillRect(-2.5, -r - 3, 5, 3.5);
+                c.restore();
+            }
+
+            // Tire Outer Rubber Ring
+            c.beginPath();
+            c.arc(0, 0, r, 0, Math.PI * 2);
+            c.fill();
+
+            // Rim
+            c.fillStyle = colors.rim || '#262626';
+            c.beginPath();
+            c.arc(0, 0, r * 0.74, 0, Math.PI * 2);
+            c.fill();
+
+            // Steel Brake Rotor Disc
+            c.fillStyle = '#555555';
+            c.beginPath();
+            c.arc(0, 0, r * 0.44, 0, Math.PI * 2);
+            c.fill();
+
+            // Center Axle Hub
+            c.fillStyle = '#0a0a0a';
+            c.beginPath();
+            c.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+            c.fill();
+
+            // Spokes
+            c.strokeStyle = colors.spokes || 'rgba(230, 230, 230, 0.65)';
+            c.lineWidth = 1.4;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI) / 4;
+                c.beginPath();
+                c.moveTo(-Math.cos(angle) * r * 0.72, -Math.sin(angle) * r * 0.72);
+                c.lineTo(Math.cos(angle) * r * 0.72, Math.sin(angle) * r * 0.72);
+                c.stroke();
+            }
         }
 
-        // Tire Outer Rubber Ring
-        ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Rim
-        ctx.fillStyle = '#262626';
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.74, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Steel Brake Rotor Disc
-        ctx.fillStyle = '#555555';
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.44, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Center Axle Hub
-        ctx.fillStyle = '#0a0a0a';
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Spokes
-        ctx.strokeStyle = 'rgba(230, 230, 230, 0.65)';
-        ctx.lineWidth = 1.4;
-        for (let i = 0; i < 8; i++) {
-            const angle = (i * Math.PI) / 4;
-            ctx.beginPath();
-            ctx.moveTo(-Math.cos(angle) * r * 0.72, -Math.sin(angle) * r * 0.72);
-            ctx.lineTo(Math.cos(angle) * r * 0.72, Math.sin(angle) * r * 0.72);
-            ctx.stroke();
-        }
-
-        ctx.restore();
+        c.restore();
     }
 
     function drawRagdollRider() {
@@ -1438,6 +2307,11 @@
             totalStarsEl.textContent = `⭐ ${totalStars}/300`;
         }
 
+        const garageBadge = document.getElementById('garageStarsBadge');
+        if (garageBadge) {
+            garageBadge.textContent = `⭐ ${totalStars} / 300 Estrellas`;
+        }
+
         const currentLvlNameEl = document.getElementById('currentLevelName');
         if (currentLvlNameEl && levelData) {
             currentLvlNameEl.textContent = `Mundo ${levelData.worldId} - Nvl ${levelData.stage}`;
@@ -1484,6 +2358,22 @@
         if (btnCloseMap) {
             btnCloseMap.addEventListener('click', () => {
                 closeLevelMap();
+            });
+        }
+
+        // Garage Modal Trigger Buttons
+        const btnOpenGarage = document.getElementById('btnOpenGarage');
+        if (btnOpenGarage) {
+            btnOpenGarage.addEventListener('click', () => {
+                window.sounds.init();
+                openGarage();
+            });
+        }
+
+        const btnCloseGarage = document.getElementById('btnCloseGarage');
+        if (btnCloseGarage) {
+            btnCloseGarage.addEventListener('click', () => {
+                closeGarage();
             });
         }
 
